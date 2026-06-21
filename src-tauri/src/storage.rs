@@ -40,9 +40,9 @@ impl Storage {
         let meta = serde_json::to_string_pretty(project)?;
         fs::write(dir.join("meta.json"), meta)?;
 
-        // 创建第一个默认卷"第一卷"
+        // P0: 卷概念先简化,所有章节放入一个虚拟卷 "default"
         let volume = Volume {
-            id: Uuid::new_v4().to_string(),
+            id: "default".to_string(),
             project_id: project.id.clone(),
             title: "第一卷".to_string(),
             order: 1,
@@ -128,7 +128,7 @@ impl Storage {
     ) -> Result<Chapter> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
-        let order = get_next_chapter_order(root, project_id, volume_id)?;
+        let order = get_next_chapter_order(root, project_id)?;
         let chapter = Chapter {
             id: id.clone(),
             volume_id: volume_id.to_string(),
@@ -142,10 +142,9 @@ impl Storage {
             updated_at: now,
         };
 
-        // 目录: chapters/<volume_id>/<chapter_id>/
+        // 目录: chapters/<chapter_id>/  (P0 简化为单层,卷 id 只作为元数据)
         let chapter_dir = Self::project_path(root, project_id)
             .join("chapters")
-            .join(volume_id)
             .join(&id);
         fs::create_dir_all(&chapter_dir)?;
         fs::write(chapter_dir.join("content.md"), "")?;
@@ -164,24 +163,18 @@ impl Storage {
             return Ok(vec![]);
         }
         let mut chapters = Vec::new();
-        for volume_entry in fs::read_dir(&chapters_dir)? {
-            let volume_entry = volume_entry?;
-            if !volume_entry.file_type()?.is_dir() {
+        for chapter_entry in fs::read_dir(&chapters_dir)? {
+            let chapter_entry = chapter_entry?;
+            if !chapter_entry.file_type()?.is_dir() {
                 continue;
             }
-            for chapter_entry in fs::read_dir(volume_entry.path())? {
-                let chapter_entry = chapter_entry?;
-                if !chapter_entry.file_type()?.is_dir() {
-                    continue;
-                }
-                let meta_path = chapter_entry.path().join("meta.json");
-                if !meta_path.exists() {
-                    continue;
-                }
-                let meta_str = fs::read_to_string(&meta_path)?;
-                let chapter: Chapter = serde_json::from_str(&meta_str)?;
-                chapters.push(chapter);
+            let meta_path = chapter_entry.path().join("meta.json");
+            if !meta_path.exists() {
+                continue;
             }
+            let meta_str = fs::read_to_string(&meta_path)?;
+            let chapter: Chapter = serde_json::from_str(&meta_str)?;
+            chapters.push(chapter);
         }
         chapters.sort_by(|a, b| a.order.cmp(&b.order));
         Ok(chapters)
@@ -194,24 +187,20 @@ impl Storage {
         chapter_id: &str,
     ) -> Result<Chapter> {
         let chapter_dir = Self::project_path(root, project_id)
-            .join("chapters");
-        // 在所有 volume 目录下查找
-        for volume_entry in fs::read_dir(&chapter_dir)? {
-            let volume_entry = volume_entry?;
-            let candidate = volume_entry.path().join(chapter_id);
-            if candidate.exists() {
-                let meta_str = fs::read_to_string(candidate.join("meta.json"))?;
-                let mut chapter: Chapter = serde_json::from_str(&meta_str)?;
-                if let Ok(content) = fs::read_to_string(candidate.join("content.md")) {
-                    chapter.content = content;
-                }
-                if let Ok(outline) = fs::read_to_string(candidate.join("outline.md")) {
-                    chapter.outline = outline;
-                }
-                return Ok(chapter);
-            }
+            .join("chapters")
+            .join(chapter_id);
+        if !chapter_dir.exists() {
+            return Err(anyhow!("Chapter not found: {}", chapter_id));
         }
-        Err(anyhow!("Chapter not found: {}", chapter_id))
+        let meta_str = fs::read_to_string(chapter_dir.join("meta.json"))?;
+        let mut chapter: Chapter = serde_json::from_str(&meta_str)?;
+        if let Ok(content) = fs::read_to_string(chapter_dir.join("content.md")) {
+            chapter.content = content;
+        }
+        if let Ok(outline) = fs::read_to_string(chapter_dir.join("outline.md")) {
+            chapter.outline = outline;
+        }
+        Ok(chapter)
     }
 
     pub fn save_chapter(
@@ -223,30 +212,25 @@ impl Storage {
         outline: &str,
     ) -> Result<()> {
         let chapter_dir = Self::project_path(root, project_id)
-            .join("chapters");
-        for volume_entry in fs::read_dir(&chapter_dir)? {
-            let volume_entry = volume_entry?;
-            let candidate = volume_entry.path().join(chapter_id);
-            if candidate.exists() {
-                fs::write(candidate.join("content.md"), content)?;
-                fs::write(candidate.join("outline.md"), outline)?;
-                // 更新 meta.json
-                let meta_str = fs::read_to_string(candidate.join("meta.json"))?;
-                let mut chapter: Chapter = serde_json::from_str(&meta_str)?;
-                chapter.content = content.to_string();
-                chapter.outline = outline.to_string();
-                chapter.word_count = count_words(content);
-                chapter.updated_at = Utc::now().to_rfc3339();
-                fs::write(
-                    candidate.join("meta.json"),
-                    serde_json::to_string_pretty(&chapter)?,
-                )?;
-                // 更新项目 updated_at
-                touch_project(root, project_id)?;
-                return Ok(());
-            }
+            .join("chapters")
+            .join(chapter_id);
+        if !chapter_dir.exists() {
+            return Err(anyhow!("Chapter not found: {}", chapter_id));
         }
-        Err(anyhow!("Chapter not found: {}", chapter_id))
+        fs::write(chapter_dir.join("content.md"), content)?;
+        fs::write(chapter_dir.join("outline.md"), outline)?;
+        let meta_str = fs::read_to_string(chapter_dir.join("meta.json"))?;
+        let mut chapter: Chapter = serde_json::from_str(&meta_str)?;
+        chapter.content = content.to_string();
+        chapter.outline = outline.to_string();
+        chapter.word_count = count_words(content);
+        chapter.updated_at = Utc::now().to_rfc3339();
+        fs::write(
+            chapter_dir.join("meta.json"),
+            serde_json::to_string_pretty(&chapter)?,
+        )?;
+        touch_project(root, project_id)?;
+        Ok(())
     }
 
     pub fn delete_chapter(
@@ -256,28 +240,23 @@ impl Storage {
         chapter_id: &str,
     ) -> Result<()> {
         let chapter_dir = Self::project_path(root, project_id)
-            .join("chapters");
-        for volume_entry in fs::read_dir(&chapter_dir)? {
-            let volume_entry = volume_entry?;
-            let candidate = volume_entry.path().join(chapter_id);
-            if candidate.exists() {
-                fs::remove_dir_all(&candidate)?;
-                return Ok(());
-            }
+            .join("chapters")
+            .join(chapter_id);
+        if !chapter_dir.exists() {
+            return Err(anyhow!("Chapter not found: {}", chapter_id));
         }
-        Err(anyhow!("Chapter not found: {}", chapter_id))
+        fs::remove_dir_all(&chapter_dir)?;
+        Ok(())
     }
 }
 
-fn get_next_chapter_order(root: &Path, project_id: &str, volume_id: &str) -> Result<u32> {
-    let volume_dir = Storage::project_path(root, project_id)
-        .join("chapters")
-        .join(volume_id);
-    if !volume_dir.exists() {
+fn get_next_chapter_order(root: &Path, project_id: &str) -> Result<u32> {
+    let chapters_dir = Storage::project_path(root, project_id).join("chapters");
+    if !chapters_dir.exists() {
         return Ok(1);
     }
     let mut max_order = 0u32;
-    for entry in fs::read_dir(&volume_dir)? {
+    for entry in fs::read_dir(&chapters_dir)? {
         let entry = entry?;
         if !entry.file_type()?.is_dir() {
             continue;
@@ -316,6 +295,13 @@ fn count_words(text: &str) -> u32 {
     count
 }
 
+impl Storage {
+    /// 公开的 count_words(供 setup seed 使用)
+    pub fn count_words_pub(text: &str) -> u32 {
+        count_words(text)
+    }
+}
+
 fn count_words_in_project(project_dir: &Path) -> u32 {
     let mut total = 0u32;
     let chapters_dir = project_dir.join("chapters");
@@ -338,16 +324,16 @@ fn get_last_chapter_title(project_dir: &Path) -> Option<String> {
         return None;
     }
     let mut chapters = Vec::new();
-    for volume_entry in fs::read_dir(&chapters_dir).ok()? {
-        let volume_entry = volume_entry.ok()?;
-        for chapter_entry in fs::read_dir(volume_entry.path()).ok()? {
-            let chapter_entry = chapter_entry.ok()?;
-            let meta = chapter_entry.path().join("meta.json");
-            if meta.exists() {
-                if let Ok(s) = fs::read_to_string(&meta) {
-                    if let Ok(c) = serde_json::from_str::<Chapter>(&s) {
-                        chapters.push(c);
-                    }
+    for chapter_entry in fs::read_dir(&chapters_dir).ok()? {
+        let chapter_entry = chapter_entry.ok()?;
+        if !chapter_entry.file_type().ok()?.is_dir() {
+            continue;
+        }
+        let meta = chapter_entry.path().join("meta.json");
+        if meta.exists() {
+            if let Ok(s) = fs::read_to_string(&meta) {
+                if let Ok(c) = serde_json::from_str::<Chapter>(&s) {
+                    chapters.push(c);
                 }
             }
         }

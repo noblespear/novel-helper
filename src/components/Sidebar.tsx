@@ -24,13 +24,14 @@ const items: NavItem[] = [
 interface SidebarProps {
   activeView: string;
   onChangeView: (id: string) => void;
+  onGoHome?: () => void;
 }
 
-export function Sidebar({ activeView, onChangeView }: SidebarProps) {
+export function Sidebar({ activeView, onChangeView, onGoHome }: SidebarProps) {
   const { currentProjectId, setCurrentProject } = useAppStore();
   return (
     <aside
-      className="w-14 flex flex-col items-center py-3 gap-1 border-r"
+      className="w-16 flex flex-col items-center py-3 gap-0.5 border-r"
       style={{ borderColor: "var(--color-border)" }}
     >
       {items.map((item) => {
@@ -40,24 +41,28 @@ export function Sidebar({ activeView, onChangeView }: SidebarProps) {
           <button
             key={item.id}
             onClick={() => {
-              if (item.id === "home") setCurrentProject(null);
-              if (!disabled) onChangeView(item.id);
+              if (item.id === "home") {
+                if (onGoHome) onGoHome();
+                else setCurrentProject(null);
+              }
+              if (!disabled && item.id !== "home") onChangeView(item.id);
             }}
             disabled={disabled}
             className={cn(
-              "w-10 h-10 flex flex-col items-center justify-center rounded-md text-base",
-              "transition-colors duration-150",
-              active && "accent",
-              !active && !disabled && "hover:elevated",
+              "w-12 h-12 flex flex-col items-center justify-center rounded-lg text-base",
+              "transition-all duration-150",
+              active && "shadow-sm",
+              !active && !disabled && "hover:bg-white/5",
               disabled && "opacity-30 cursor-not-allowed"
             )}
             style={{
               background: active ? "var(--color-elevated)" : undefined,
+              color: active ? "var(--color-accent)" : undefined,
             }}
             title={item.label}
           >
-            <span>{item.icon}</span>
-            <span className="text-[10px] mt-0.5">{item.label}</span>
+            <span className="text-lg leading-none">{item.icon}</span>
+            <span className="text-[10px] mt-0.5 leading-none">{item.label}</span>
           </button>
         );
       })}

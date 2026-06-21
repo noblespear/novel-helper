@@ -22,9 +22,8 @@ export function ChapterTree({ projectId }: ChapterTreeProps) {
   const createChapter = async () => {
     if (!newTitle.trim()) return;
     try {
-      // P0: 默认创建到第一个卷
-      const volumeId = "v1"; // TODO: 真实卷管理(P2)
-      const c = await api.createChapter(projectId, volumeId, newTitle.trim());
+      // P0: 单卷模式,固定使用 "default"
+      const c = await api.createChapter(projectId, "default", newTitle.trim());
       await refreshChapters(projectId);
       setCurrentChapter(c.id);
       setCreating(false);

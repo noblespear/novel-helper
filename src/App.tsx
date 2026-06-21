@@ -10,22 +10,22 @@ import { RightPanel } from "./components/RightPanel";
 import { CommandPalette } from "./components/CommandPalette";
 import { useAppStore } from "./stores/app";
 import { api } from "./lib/api";
-import { cn } from "./lib/utils";
 
 type View = "home" | "writing" | "outline" | "character" | "setting" | "material" | "tool" | "setting-app";
 
 export default function App() {
   const [view, setView] = useState<View>("home");
-  const { theme, font, immersive, currentProjectId, setCurrentProject, chapters, currentChapterId, toggleImmersive } = useAppStore();
+  const { theme, font, immersive, currentProjectId, setCurrentProject, refreshChapters, chapters, currentChapterId, toggleImmersive } = useAppStore();
 
   // 应用主题类
   useEffect(() => {
     document.documentElement.className = theme === "dark" ? "" : `theme-${theme}`;
   }, [theme]);
 
-  // 应用字体类
+  // 应用字体类(写到 html 以保证全局生效,避免与 body 字号冲突)
   useEffect(() => {
-    document.body.className = `font-${font}`;
+    document.documentElement.classList.remove("font-writing", "font-serif", "font-sans");
+    document.documentElement.classList.add(`font-${font}`);
   }, [font]);
 
   // 全局快捷键
@@ -45,10 +45,17 @@ export default function App() {
     try {
       await api.openProject(id);
       setCurrentProject(id);
+      await refreshChapters(id); // 关键:进入项目后立刻拉取章节
       setView("writing");
     } catch (e) {
       console.error("Open project failed:", e);
     }
+  };
+
+  // 切换到 home 视图时清空当前项目
+  const onGoHome = () => {
+    setCurrentProject(null);
+    setView("home");
   };
 
   // 计算当前章节
@@ -90,7 +97,7 @@ export default function App() {
     <div className="h-full w-full flex flex-col">
       {!immersive && <TopBar projectName={projectName} chapterTitle={currentChapter?.title ?? null} />}
       <div className="flex-1 flex overflow-hidden">
-        {!immersive && <Sidebar activeView={view} onChangeView={(v) => setView(v as View)} />}
+        {!immersive && <Sidebar activeView={view} onChangeView={(v) => setView(v as View)} onGoHome={onGoHome} />}
         {renderMain()}
       </div>
       <CommandPalette />

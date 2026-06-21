@@ -49,7 +49,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   // 作品
   projects: [],
   currentProjectId: null,
-  setCurrentProject: (id) => set({ currentProjectId: id }),
+  setCurrentProject: (id) => {
+    // 切换作品时清空章节 + 选中状态
+    set({
+      currentProjectId: id,
+      chapters: [],
+      currentChapterId: null,
+    });
+  },
   refreshProjects: async () => {
     try {
       const list = await api.listProjects();

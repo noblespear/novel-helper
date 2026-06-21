@@ -9,15 +9,16 @@
 
 @layer base {
   :root {
-    --color-bg: #0F1612;
-    --color-surface: #16201B;
-    --color-elevated: #1E2A24;
-    --color-border: #2A3830;
-    --color-text: #D4CFC2;
-    --color-text-muted: #8B9388;
+    --color-bg: #131C18;
+    --color-surface: #1B2520;
+    --color-elevated: #243027;
+    --color-border: #2F3D33;
+    --color-text: #E6DFCF;
+    --color-text-muted: #8A9189;
     --color-accent: #E5A55C;
     --color-accent-bright: #F0BC7A;
     --color-accent-dim: #C28A47;
+    --color-accent-soft: rgba(229, 165, 92, 0.12);
   }
 
   html, body, #root {
@@ -31,13 +32,27 @@
   body {
     background: var(--color-bg);
     color: var(--color-text);
-    font-family: 'Source Han Sans SC', 'Noto Sans SC', 'PingFang SC',
-                 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+    font-family: 'Source Han Serif SC', 'Noto Serif SC', 'Songti SC',
+                 'STSong', 'SimSun', serif;
     font-size: 14px;
     line-height: 1.7;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  /* 字体偏好 */
+  html.font-writing body {
+    font-family: 'LXGW WenKai', 'Source Han Serif SC', 'Noto Serif SC',
+                 'Songti SC', 'STSong', 'SimSun', serif;
+  }
+  html.font-serif body {
+    font-family: 'Source Han Serif SC', 'Noto Serif SC', 'Songti SC',
+                 'STSong', 'SimSun', serif;
+  }
+  html.font-sans body {
+    font-family: 'Source Han Sans SC', 'Noto Sans SC', 'PingFang SC',
+                 'Microsoft YaHei', system-ui, sans-serif;
   }
 
   /* 主题变体 */
@@ -51,32 +66,20 @@
     --color-accent: #C27841;
     --color-accent-bright: #D89055;
     --color-accent-dim: #A26030;
+    --color-accent-soft: rgba(194, 120, 65, 0.12);
   }
 
   .theme-light {
     --color-bg: #FAFAF7;
     --color-surface: #FFFFFF;
-    --color-elevated: #F5F2EC;
-    --color-border: #E5E1D8;
+    --color-elevated: #F0EDE5;
+    --color-border: #E0DCD0;
     --color-text: #1A1714;
     --color-text-muted: #6B6457;
     --color-accent: #D4904F;
     --color-accent-bright: #E0A060;
     --color-accent-dim: #B07A3F;
-  }
-
-  /* 字体偏好 */
-  .font-writing {
-    font-family: 'LXGW WenKai', 'Source Han Serif SC', 'Noto Serif SC',
-                 'Songti SC', STSong, SimSun, serif;
-  }
-  .font-serif {
-    font-family: 'Source Han Serif SC', 'Noto Serif SC', 'Songti SC',
-                 STSong, SimSun, serif;
-  }
-  .font-sans {
-    font-family: 'Source Han Sans SC', 'Noto Sans SC', 'PingFang SC',
-                 'Microsoft YaHei', system-ui, sans-serif;
+    --color-accent-soft: rgba(212, 144, 79, 0.12);
   }
 
   /* 滚动条 */
@@ -119,11 +122,12 @@
   .accent { color: var(--color-accent); }
   .accent-bg { background: var(--color-accent); }
   .accent-bright { color: var(--color-accent-bright); }
+  .accent-soft-bg { background: var(--color-accent-soft); }
 
   /* 按钮基础 */
   .btn {
     @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5
-           text-sm rounded-md border transition-colors duration-150
+           text-sm rounded-md border transition-all duration-150
            disabled:opacity-50 disabled:cursor-not-allowed;
     border-color: var(--color-border);
     color: var(--color-text);
@@ -135,7 +139,8 @@
   .btn-primary {
     background: var(--color-accent);
     border-color: var(--color-accent);
-    color: var(--color-bg);
+    color: #131C18;
+    font-weight: 500;
   }
   .btn-primary:hover:not(:disabled) {
     background: var(--color-accent-bright);
@@ -182,7 +187,7 @@
     background: var(--color-elevated);
   }
   .chapter-item.active {
-    background: var(--color-accent);
-    color: var(--color-bg);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
   }
 }
