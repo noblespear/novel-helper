@@ -1,0 +1,37 @@
+[package]
+name = "novel-helper"
+version = "0.1.0"
+description = "AI 深度结合的中文网文长篇连载创作工作台"
+authors = ["nobelspear"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "novel_helper_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.1", features = [] }
+tauri-plugin-dialog = "2.0"
+tauri-plugin-fs = "2.0"
+tauri-plugin-global-shortcut = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+thiserror = "1.0"
+anyhow = "1.0"
+walkdir = "2.5"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+directories = "5.0"
+sha2 = "0.10"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

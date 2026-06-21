@@ -10,7 +10,7 @@ out/
 
 # Tauri
 src-tauri/target/
-src-tauri/Cargo.lock
+# Note: src-tauri/Cargo.lock IS committed (this is a binary project, not a library)
 src-tauri/gen/
 
 # Vite
