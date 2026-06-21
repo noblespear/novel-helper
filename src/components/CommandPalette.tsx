@@ -12,8 +12,7 @@ interface Command {
 }
 
 export function CommandPalette() {
-  const { commandPaletteOpen, setCommandPaletteOpen, toggleImmersive, setTheme } =
-    useAppStore();
+  const { commandPaletteOpen, setCommandPaletteOpen, toggleImmersive, setTheme, setRightPanel } = useAppStore();
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -82,6 +81,26 @@ export function CommandPalette() {
       group: "作品",
       action: () => {
         alert("请点击左栏的 + 按钮新建章节(快捷键支持计划中)");
+        setCommandPaletteOpen(false);
+      },
+    },
+    {
+      id: "ai-chat",
+      label: "打开 AI 助手",
+      hint: "右栏 → AI",
+      group: "AI",
+      action: () => {
+        setRightPanel("ai");
+        setCommandPaletteOpen(false);
+      },
+    },
+    {
+      id: "ai-settings",
+      label: "AI 设置",
+      hint: "配置 Provider / API Key",
+      group: "AI",
+      action: () => {
+        setRightPanel("ai-settings");
         setCommandPaletteOpen(false);
       },
     },

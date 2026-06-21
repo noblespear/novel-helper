@@ -84,7 +84,12 @@ export default function App() {
   // 视图分发
   const renderMain = () => {
     if (view === "home" || !currentProjectId) {
-      return <ProjectList onOpenProject={onOpenProject} />;
+      return (
+        <div className="flex-1 flex">
+          <ProjectList onOpenProject={onOpenProject} />
+          {!immersive && <RightPanel />}
+        </div>
+      );
     }
     if (view === "writing") {
       return (
@@ -103,10 +108,13 @@ export default function App() {
       );
     }
     return (
-      <Placeholder
-        title={view}
-        message="P0 阶段:此功能为占位,P1/P2 阶段实现"
-      />
+      <div className="flex-1 flex">
+        <Placeholder
+          title={view}
+          message="P0 阶段:此功能为占位,P1/P2 阶段实现"
+        />
+        {!immersive && <RightPanel />}
+      </div>
     );
   };
 

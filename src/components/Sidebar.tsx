@@ -33,52 +33,58 @@ export function Sidebar({ activeView, onChangeView, onGoHome }: SidebarProps) {
       className="w-16 flex flex-col items-center py-3 gap-0.5 border-r"
       style={{ borderColor: "var(--color-border)" }}
     >
-      {items.map((item) => {
-        const disabled = item.requiresProject && !currentProjectId;
-        const active = activeView === item.id;
-        return (
-          <button
-            key={item.id}
-            onClick={() => {
-              if (item.id === "home") {
-                if (onGoHome) onGoHome();
-                else setCurrentProject(null);
-              }
-              if (!disabled && item.id !== "home") onChangeView(item.id);
-            }}
-            disabled={disabled}
-            className={cn(
-              "w-12 h-12 flex flex-col items-center justify-center rounded-lg text-base",
-              "transition-all duration-150",
-              active && "shadow-sm",
-              !active && !disabled && "hover:bg-white/5",
-              disabled && "opacity-30 cursor-not-allowed"
-            )}
-            style={{
-              background: active ? "var(--color-elevated)" : undefined,
-              color: active ? "var(--color-accent)" : undefined,
-            }}
-            title={item.label}
-          >
-            <span className="text-lg leading-none">{item.icon}</span>
-            <span className="text-[10px] mt-0.5 leading-none">{item.label}</span>
-          </button>
-        );
-      })}
+      {/* 滚动容器,items 区域 */}
+      <div className="flex-1 flex flex-col items-center py-3 gap-0.5 w-full overflow-y-auto">
+        {items.map((item) => {
+          const disabled = item.requiresProject && !currentProjectId;
+          const active = activeView === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                if (item.id === "home") {
+                  if (onGoHome) onGoHome();
+                  else setCurrentProject(null);
+                }
+                if (!disabled && item.id !== "home") onChangeView(item.id);
+              }}
+              disabled={disabled}
+              className={cn(
+                "w-12 h-12 flex flex-col items-center justify-center rounded-lg text-base",
+                "transition-all duration-150",
+                active && "shadow-sm",
+                !active && !disabled && "hover:bg-white/5",
+                disabled && "opacity-30 cursor-not-allowed"
+              )}
+              style={{
+                background: active ? "var(--color-elevated)" : undefined,
+                color: active ? "var(--color-accent)" : undefined,
+              }}
+              title={item.label}
+            >
+              <span className="text-lg leading-none">{item.icon}</span>
+              <span className="text-[10px] mt-0.5 leading-none">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
-      {/* AI 设置入口(底部) */}
-      <div className="flex-1" />
-      <button
-        onClick={() => {
-          // 切到 AI 设置右栏
-          setRightPanel("ai-settings");
-        }}
-        className="w-12 h-12 flex flex-col items-center justify-center rounded-lg text-base hover:bg-white/5"
-        title="AI 设置"
+      {/* AI 设置入口(底部,sticky 定位保证始终可见) */}
+      <div
+        className="w-full pt-2 pb-2 border-t"
+        style={{ borderColor: "var(--color-border)", background: "var(--color-bg)" }}
       >
-        <span className="text-lg leading-none">⚙</span>
-        <span className="text-[10px] mt-0.5 leading-none">AI</span>
-      </button>
+        <button
+          onClick={() => {
+            setRightPanel("ai-settings");
+          }}
+          className="w-12 h-12 mx-auto flex flex-col items-center justify-center rounded-lg text-base hover:bg-white/5"
+          title="AI 设置"
+        >
+          <span className="text-lg leading-none">⚙</span>
+          <span className="text-[10px] mt-0.5 leading-none">AI</span>
+        </button>
+      </div>
     </aside>
   );
 }
