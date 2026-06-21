@@ -8,6 +8,7 @@ import { ChapterTree } from "./components/ChapterTree";
 import { Editor } from "./components/Editor";
 import { RightPanel } from "./components/RightPanel";
 import { CommandPalette } from "./components/CommandPalette";
+import { ImmersiveOverlay } from "./components/ImmersiveOverlay";
 import { useAppStore } from "./stores/app";
 import { api } from "./lib/api";
 
@@ -15,7 +16,7 @@ type View = "home" | "writing" | "outline" | "character" | "setting" | "material
 
 export default function App() {
   const [view, setView] = useState<View>("home");
-  const { theme, font, immersive, currentProjectId, setCurrentProject, refreshChapters, chapters, currentChapterId, toggleImmersive } = useAppStore();
+  const { theme, font, immersive, currentProjectId, setCurrentProject, refreshChapters, chapters, currentChapterId, toggleImmersive, commandPaletteOpen, setCommandPaletteOpen } = useAppStore();
 
   // 应用主题类
   useEffect(() => {
@@ -31,14 +32,25 @@ export default function App() {
   // 全局快捷键
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // 防止在文本输入时触发(Esc 退出命令面板优先)
+      const target = e.target as HTMLElement;
+      const inEditor = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "B") {
         e.preventDefault();
         toggleImmersive();
+        return;
+      }
+      // Esc 退出沉浸(优先于命令面板的 Esc 关闭)
+      if (e.key === "Escape" && immersive) {
+        e.preventDefault();
+        toggleImmersive();
+        return;
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleImmersive]);
+  }, [toggleImmersive, immersive]);
 
   // 进入作品
   const onOpenProject = async (id: string) => {
@@ -100,6 +112,7 @@ export default function App() {
         {!immersive && <Sidebar activeView={view} onChangeView={(v) => setView(v as View)} onGoHome={onGoHome} />}
         {renderMain()}
       </div>
+      <ImmersiveOverlay />
       <CommandPalette />
     </div>
   );
