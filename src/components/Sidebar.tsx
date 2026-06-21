@@ -18,7 +18,6 @@ const items: NavItem[] = [
   { id: "setting", label: "设定", icon: "🌍", requiresProject: true },
   { id: "material", label: "素材", icon: "💎", requiresProject: true },
   { id: "tool", label: "工具", icon: "🔧", requiresProject: false },
-  { id: "setting-app", label: "设置", icon: "⚙", requiresProject: false },
 ];
 
 interface SidebarProps {
@@ -28,7 +27,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeView, onChangeView, onGoHome }: SidebarProps) {
-  const { currentProjectId, setCurrentProject } = useAppStore();
+  const { currentProjectId, setCurrentProject, setRightPanel } = useAppStore();
   return (
     <aside
       className="w-16 flex flex-col items-center py-3 gap-0.5 border-r"
@@ -66,6 +65,20 @@ export function Sidebar({ activeView, onChangeView, onGoHome }: SidebarProps) {
           </button>
         );
       })}
+
+      {/* AI 设置入口(底部) */}
+      <div className="flex-1" />
+      <button
+        onClick={() => {
+          // 切到 AI 设置右栏
+          setRightPanel("ai-settings");
+        }}
+        className="w-12 h-12 flex flex-col items-center justify-center rounded-lg text-base hover:bg-white/5"
+        title="AI 设置"
+      >
+        <span className="text-lg leading-none">⚙</span>
+        <span className="text-[10px] mt-0.5 leading-none">AI</span>
+      </button>
     </aside>
   );
 }

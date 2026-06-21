@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { api } from "../lib/api";
-import type { Chapter, FontFamily, ProjectSummary, Theme } from "../types";
+import type { Chapter, FontFamily, ProjectSummary, ProviderConfig, Theme } from "../types";
 
 interface AppState {
   // 主题与外观
@@ -25,9 +25,14 @@ interface AppState {
   setCurrentChapter: (id: string | null) => void;
   refreshChapters: (projectId: string) => Promise<void>;
 
+  // AI
+  aiConfig: ProviderConfig | null;
+  setAIConfig: (c: ProviderConfig) => void;
+  loadAISettings: () => Promise<void>;
+
   // UI
-  rightPanel: "outline" | "character" | "ai" | "rag";
-  setRightPanel: (p: "outline" | "character" | "ai" | "rag") => void;
+  rightPanel: "outline" | "character" | "ai" | "rag" | "ai-settings";
+  setRightPanel: (p: "outline" | "character" | "ai" | "rag" | "ai-settings") => void;
   leftPanelVisible: boolean;
   toggleLeftPanel: () => void;
   commandPaletteOpen: boolean;
@@ -50,7 +55,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   projects: [],
   currentProjectId: null,
   setCurrentProject: (id) => {
-    // 切换作品时清空章节 + 选中状态
     set({
       currentProjectId: id,
       chapters: [],
@@ -76,6 +80,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ chapters: list });
     } catch (e) {
       console.error("Failed to list chapters:", e);
+    }
+  },
+
+  // AI
+  aiConfig: null,
+  setAIConfig: (c) => set({ aiConfig: c }),
+  loadAISettings: async () => {
+    try {
+      const s = await api.getAISettings();
+      set({ aiConfig: s.config });
+    } catch (e) {
+      console.error("Failed to load AI settings:", e);
     }
   },
 

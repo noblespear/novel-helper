@@ -51,5 +51,29 @@ export interface CreateProjectRequest {
   daily_goal: number;
 }
 
+// AI 相关
+export interface ProviderConfig {
+  provider_type: "mock" | "openai" | "anthropic";
+  api_key: string;
+  base_url: string;
+  model: string;
+}
+
+export interface AISettings {
+  config: ProviderConfig;
+  prompt_overrides: unknown;
+}
+
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface ChatChunk {
+  content: string;
+  done: boolean;
+  usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null;
+}
+
 export type Theme = "dark" | "eye" | "light";
 export type FontFamily = "writing" | "serif" | "sans";

@@ -2,10 +2,13 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::Manager;
 
+mod ai;
 mod commands;
 mod project;
 mod storage;
+mod ai_state;
 
+use ai::ProviderConfig;
 use storage::Storage;
 
 /// 应用配置
@@ -43,6 +46,14 @@ pub fn run() {
             // 初始化存储
             let storage = Storage::new(app.handle().clone())?;
             app.manage(storage);
+
+            // 初始化 AI 状态
+            let config_dir = config.projects_dir.parent()
+                .unwrap_or(&config.projects_dir)
+                .to_path_buf();
+            std::fs::create_dir_all(&config_dir).ok();
+            let ai_state = crate::ai_state::AIState::new(&config_dir);
+            app.manage(ai_state);
 
             // 首次启动 seed 一个示例项目(便于演示与开发)
             let projects_dir = config.projects_dir.clone();
@@ -106,6 +117,22 @@ pub fn run() {
             }
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            commands::create_project,
+            commands::list_projects,
+            commands::open_project,
+            commands::delete_project,
+            commands::save_chapter,
+            commands::load_chapter,
+            commands::list_chapters,
+            commands::create_chapter,
+            commands::delete_chapter,
+            commands::get_ai_settings,
+            commands::update_ai_config,
+            commands::list_ai_models,
+            commands::validate_ai_key,
+            commands::ai_chat_stream,
+        ])
         .invoke_handler(tauri::generate_handler![
             commands::create_project,
             commands::list_projects,

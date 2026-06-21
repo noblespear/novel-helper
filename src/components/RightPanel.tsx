@@ -1,6 +1,8 @@
-// 右栏(可切换:大纲/人物/AI/RAG) - P0 暂时是占位 UI
+// 右栏(可切换:大纲/人物/AI/RAG/AI设置)
 
 import { useAppStore } from "../stores/app";
+import { AIChatPanel } from "./AIChatPanel";
+import { AISettingsPanel } from "./AISettingsPanel";
 import { cn } from "../lib/utils";
 
 const tabs = [
@@ -14,7 +16,7 @@ export function RightPanel() {
   const { rightPanel, setRightPanel } = useAppStore();
   return (
     <aside
-      className="w-72 border-l flex flex-col"
+      className="w-80 border-l flex flex-col"
       style={{ borderColor: "var(--color-border)" }}
     >
       <div
@@ -43,11 +45,12 @@ export function RightPanel() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-auto p-4 text-sm">
+      <div className="flex-1 overflow-auto text-sm">
         {rightPanel === "outline" && <OutlinePanel />}
         {rightPanel === "character" && <CharacterPanel />}
-        {rightPanel === "ai" && <AIPanel />}
+        {rightPanel === "ai" && <AIChatPanel />}
         {rightPanel === "rag" && <RAGPanel />}
+        {rightPanel === "ai-settings" && <AISettingsPanel />}
       </div>
     </aside>
   );
@@ -55,7 +58,7 @@ export function RightPanel() {
 
 function OutlinePanel() {
   return (
-    <div className="text-muted">
+    <div className="text-muted p-4">
       <p className="mb-2">📋 章节大纲</p>
       <p className="text-xs">P0 阶段:仅占位,P2 阶段实现细纲编辑</p>
     </div>
@@ -64,25 +67,16 @@ function OutlinePanel() {
 
 function CharacterPanel() {
   return (
-    <div className="text-muted">
+    <div className="text-muted p-4">
       <p className="mb-2">👤 当前章节人物</p>
       <p className="text-xs">P0 阶段:仅占位,P2 阶段实现角色卡</p>
     </div>
   );
 }
 
-function AIPanel() {
-  return (
-    <div className="text-muted">
-      <p className="mb-2">🤖 AI 助手</p>
-      <p className="text-xs">P0 阶段:仅占位,P1 阶段接入 AI</p>
-    </div>
-  );
-}
-
 function RAGPanel() {
   return (
-    <div className="text-muted">
+    <div className="text-muted p-4">
       <p className="mb-2">🔍 全书检索</p>
       <p className="text-xs">P0 阶段:仅占位,P3 阶段实现 RAG</p>
     </div>

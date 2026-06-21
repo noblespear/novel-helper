@@ -16,7 +16,12 @@ type View = "home" | "writing" | "outline" | "character" | "setting" | "material
 
 export default function App() {
   const [view, setView] = useState<View>("home");
-  const { theme, font, immersive, currentProjectId, setCurrentProject, refreshChapters, chapters, currentChapterId, toggleImmersive, commandPaletteOpen, setCommandPaletteOpen } = useAppStore();
+  const { theme, font, immersive, currentProjectId, setCurrentProject, refreshChapters, chapters, currentChapterId, toggleImmersive, commandPaletteOpen, setCommandPaletteOpen, loadAISettings } = useAppStore();
+
+  // 加载 AI 设置
+  useEffect(() => {
+    loadAISettings();
+  }, [loadAISettings]);
 
   // 应用主题类
   useEffect(() => {

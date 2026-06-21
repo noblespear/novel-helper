@@ -1,11 +1,14 @@
 //! Tauri 命令模块 - 暴露给前端的所有 IPC 入口
 
+use crate::ai::{ChatMessage, ChatRequest, ProviderConfig, ProviderRegistry};
+use crate::ai_state::{AISettings, AIState};
 use crate::project::{Project, ProjectSummary};
 use crate::storage::Storage;
 use crate::AppConfig;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use std::sync::Mutex;
+use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -156,4 +159,73 @@ pub fn delete_chapter(
     storage
         .delete_chapter(&config.projects_dir, &project_id, &chapter_id)
         .map_err(|e| e.to_string())
+}
+
+// =================== AI 命令 ===================
+
+/// 获取 AI 设置
+#[tauri::command]
+pub fn get_ai_settings(ai_state: State<AIState>) -> AISettings {
+    let s = ai_state.settings.lock().unwrap();
+    AISettings {
+        config: s.config.clone(),
+        prompt_overrides: s.prompt_overrides.clone(),
+    }
+}
+
+/// 更新 AI Provider 配置
+#[tauri::command]
+pub fn update_ai_config(
+    ai_state: State<AIState>,
+    new_config: ProviderConfig,
+) -> Result<ProviderConfig, String> {
+    ai_state.update_config(new_config.clone())?;
+    Ok(new_config)
+}
+
+/// 列出可用模型(由当前 provider 返回)
+#[tauri::command]
+pub async fn list_ai_models(
+    ai_state: State<'_, AIState>,
+) -> Result<Vec<String>, String> {
+    let config = ai_state.get_config();
+    let registry = ProviderRegistry::new(config);
+    registry.list_models().await
+}
+
+/// 验证 API key
+#[tauri::command]
+pub async fn validate_ai_key(
+    ai_state: State<'_, AIState>,
+) -> Result<bool, String> {
+    let config = ai_state.get_config();
+    let registry = ProviderRegistry::new(config);
+    registry.validate().await
+}
+
+/// 流式 AI 聊天 - 通过 Tauri Channel 推送增量
+#[tauri::command]
+pub async fn ai_chat_stream(
+    ai_state: State<'_, AIState>,
+    on_chunk: tauri::ipc::Channel<crate::ai::ChatChunk>,
+    messages: Vec<ChatMessage>,
+    model: Option<String>,
+) -> Result<(), String> {
+    let config = ai_state.get_config();
+    let registry = ProviderRegistry::new(config);
+
+    let mut req = ChatRequest {
+        messages,
+        ..Default::default()
+    };
+    req.model = model.unwrap_or_else(|| ai_state.get_config().model);
+
+    registry
+        .chat_stream(
+            req,
+            Box::new(move |chunk| {
+                let _ = on_chunk.send(chunk);
+            }),
+        )
+        .await
 }

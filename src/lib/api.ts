@@ -1,11 +1,15 @@
 // Tauri IPC 封装
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 import type {
   Chapter,
   CreateProjectRequest,
   Project,
   ProjectSummary,
+  ProviderConfig,
+  AISettings,
+  ChatMessage,
+  ChatChunk,
 } from "../types";
 
 export const api = {
@@ -39,4 +43,24 @@ export const api = {
     }),
   deleteChapter: (projectId: string, chapterId: string) =>
     invoke<void>("delete_chapter", { projectId, chapterId }),
+
+  // AI
+  getAISettings: () => invoke<AISettings>("get_ai_settings"),
+  updateAIConfig: (newConfig: ProviderConfig) =>
+    invoke<ProviderConfig>("update_ai_config", { newConfig }),
+  listAIModels: () => invoke<string[]>("list_ai_models"),
+  validateAIKey: () => invoke<boolean>("validate_ai_key"),
+  aiChatStream: (
+    messages: ChatMessage[],
+    onChunk: (chunk: ChatChunk) => void,
+    model?: string
+  ) => {
+    const channel = new Channel<ChatChunk>();
+    channel.onmessage = onChunk;
+    return invoke<void>("ai_chat_stream", {
+      onChunk: channel,
+      messages,
+      model: model ?? null,
+    });
+  },
 };
