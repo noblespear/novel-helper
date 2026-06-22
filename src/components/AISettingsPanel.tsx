@@ -3,7 +3,47 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "../stores/app";
 import { api } from "../lib/api";
-import type { ProviderConfig } from "../types";
+import type { ProviderConfig, PromptTemplates } from "../types";
+
+const DEFAULT_PROMPTS: PromptTemplates = {
+  polish_selection:
+    "你是一个中文网文润色助手。保持作者文风,只改不通顺、错别字、明显病句。直接返回润色后的文本,不要解释、不要 markdown 包裹。",
+  polish_chapter:
+    "你是一个中文网文润色助手。保持作者文风,只改不通顺、错别字、明显病句。直接返回润色后的全文,不要解释。",
+  continue_write:
+    "你是中文网文续写助手。基于用户给的正文续写约 200 字,保持文风一致,情节连贯。只返回续写内容,不要解释。",
+  character_design: "你是网文编辑,擅长角色设计。",
+  general_chat:
+    "你是一个中文网文写作助手,帮作者构思、答疑、激发灵感。回答简洁有针对性,优先给可执行的具体建议。",
+};
+
+const PROMPT_KEYS: { key: keyof PromptTemplates; label: string; hint: string }[] = [
+  {
+    key: "polish_selection",
+    label: "选区润色",
+    hint: "用于「润色选区」,占位符:{text} {chapter_title}",
+  },
+  {
+    key: "polish_chapter",
+    label: "整章润色",
+    hint: "用于「润色本章」,占位符:{text} {chapter_title}",
+  },
+  {
+    key: "continue_write",
+    label: "续写",
+    hint: "用于「续写 200 字」,占位符:{text} {chapter_title}",
+  },
+  {
+    key: "character_design",
+    label: "角色设计",
+    hint: "用于「角色建议」",
+  },
+  {
+    key: "general_chat",
+    label: "通用聊天",
+    hint: "用于普通对话,空 = 不发 system 消息",
+  },
+];
 
 const PRESET_PROVIDERS = [
   {
@@ -55,16 +95,27 @@ export function AISettingsPanel() {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [promptsOpen, setPromptsOpen] = useState(false);
+  const [prompts, setPrompts] = useState<PromptTemplates>(DEFAULT_PROMPTS);
+  const [promptsSaving, setPromptsSaving] = useState(false);
+  const [promptsResult, setPromptsResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (aiConfig) {
       setProviderType(aiConfig.provider_type);
       setBaseUrl(aiConfig.base_url);
       setModel(aiConfig.model);
-      // 标记 keyring 里有 key(用于 UI 提示)
       setApiKey(aiConfig.api_key || "");
     }
   }, [aiConfig]);
+
+  // 加载提示词模板
+  useEffect(() => {
+    api
+      .getPromptTemplates()
+      .then((t) => setPrompts(t))
+      .catch(() => setPrompts(DEFAULT_PROMPTS));
+  }, []);
 
   const onPresetChange = (presetLabel: string) => {
     const preset = PRESET_PROVIDERS.find((p) => p.label === presetLabel);
@@ -92,6 +143,25 @@ export function AISettingsPanel() {
       setTestResult(`✗ 保存失败: ${e}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSavePrompts = async () => {
+    setPromptsSaving(true);
+    setPromptsResult(null);
+    try {
+      await api.updatePromptTemplates(prompts);
+      setPromptsResult("✓ 已保存");
+    } catch (e) {
+      setPromptsResult(`✗ 保存失败: ${e}`);
+    } finally {
+      setPromptsSaving(false);
+    }
+  };
+
+  const resetPrompts = () => {
+    if (confirm("恢复全部提示词为内置默认值?当前编辑会丢失。")) {
+      setPrompts(DEFAULT_PROMPTS);
     }
   };
 
@@ -252,15 +322,86 @@ export function AISettingsPanel() {
           <li>API Key: {aiConfig?.api_key ? "已设置 ✓" : "未设置"}</li>
         </ul>
       </div>
+
+      {/* 系统提示词模板 */}
+      <div className="mt-6 card p-5">
+        <button
+          onClick={() => setPromptsOpen((v) => !v)}
+          className="w-full flex items-center justify-between text-left"
+        >
+          <div>
+            <div className="font-medium">系统提示词模板</div>
+            <div className="text-xs text-muted mt-0.5">
+              自定义每个 AI 动作的系统提示,留空表示使用内置默认
+            </div>
+          </div>
+          <span className="text-muted">{promptsOpen ? "▾" : "▸"}</span>
+        </button>
+
+        {promptsOpen && (
+          <div className="mt-4 space-y-4">
+            {PROMPT_KEYS.map(({ key, label, hint }) => (
+              <Field key={key} label={label} hint={hint}>
+                <textarea
+                  className="input text-xs font-mono min-h-[60px] resize-y"
+                  value={prompts[key]}
+                  onChange={(e) =>
+                    setPrompts((p) => ({ ...p, [key]: e.target.value }))
+                  }
+                  placeholder="(空 = 使用内置默认)"
+                />
+              </Field>
+            ))}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                className="btn btn-primary"
+                onClick={handleSavePrompts}
+                disabled={promptsSaving}
+              >
+                {promptsSaving ? "保存中..." : "保存提示词"}
+              </button>
+              <button className="btn" onClick={resetPrompts}>
+                恢复默认
+              </button>
+            </div>
+
+            {promptsResult && (
+              <div
+                className="text-sm px-3 py-2 rounded"
+                style={{
+                  background: promptsResult.startsWith("✓")
+                    ? "var(--color-accent-soft-bg, rgba(229, 165, 92, 0.12))"
+                    : "rgba(220, 50, 50, 0.12)",
+                  color: promptsResult.startsWith("✓")
+                    ? "var(--color-accent)"
+                    : "#e57373",
+                }}
+              >
+                {promptsResult}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block">
       <div className="text-xs text-muted mb-1.5 font-medium">{label}</div>
       {children}
+      {hint && <div className="text-xs text-muted mt-1">{hint}</div>}
     </label>
   );
 }

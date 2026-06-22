@@ -5,7 +5,28 @@ import { useAppStore } from "../stores/app";
 import { api } from "../lib/api";
 import { getEditorApi } from "../lib/editorBridge";
 import { DiffView } from "./DiffView";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, PromptTemplates } from "../types";
+
+const DEFAULT_PROMPTS: PromptTemplates = {
+  polish_selection:
+    "你是一个中文网文润色助手。保持作者文风,只改不通顺、错别字、明显病句。直接返回润色后的文本,不要解释、不要 markdown 包裹。",
+  polish_chapter:
+    "你是一个中文网文润色助手。保持作者文风,只改不通顺、错别字、明显病句。直接返回润色后的全文,不要解释。",
+  continue_write:
+    "你是中文网文续写助手。基于用户给的正文续写约 200 字,保持文风一致,情节连贯。只返回续写内容,不要解释。",
+  character_design: "你是网文编辑,擅长角色设计。",
+  general_chat:
+    "你是一个中文网文写作助手,帮作者构思、答疑、激发灵感。回答简洁有针对性,优先给可执行的具体建议。",
+};
+
+function renderTemplate(tpl: string, text: string, chapterTitle: string): string {
+  return tpl.replace(/\{text\}/g, text).replace(/\{chapter_title\}/g, chapterTitle);
+}
+
+function pickPrompt(templates: PromptTemplates | null, key: keyof PromptTemplates): string {
+  const t = templates?.[key]?.trim();
+  return t && t.length > 0 ? t : DEFAULT_PROMPTS[key];
+}
 
 interface Message {
   id: string;
@@ -25,7 +46,16 @@ export function AIChatPanel() {
   const [busy, setBusy] = useState(false);
   const [tokens, setTokens] = useState(0);
   const [selection, setSelection] = useState("");
+  const [templates, setTemplates] = useState<PromptTemplates | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // 加载提示词模板
+  useEffect(() => {
+    api
+      .getPromptTemplates()
+      .then((t) => setTemplates(t))
+      .catch(() => setTemplates(null));
+  }, []);
 
   // 定时轮询编辑器选区(只在 chat 面板挂载期间)
   useEffect(() => {
@@ -64,8 +94,15 @@ export function AIChatPanel() {
       .filter((m) => m.role !== "system")
       .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-    const systemMsg: ChatMessage | null = systemPrompt
-      ? { role: "system", content: systemPrompt }
+    // 默认 system 提示(空字符串不发送 system 消息)
+    let effectiveSystem = systemPrompt ?? "";
+    if (!effectiveSystem) {
+      const tpl = pickPrompt(templates, "general_chat");
+      effectiveSystem = tpl;
+    }
+
+    const systemMsg: ChatMessage | null = effectiveSystem
+      ? { role: "system", content: effectiveSystem }
       : null;
 
     const allMsgs: ChatMessage[] = [
@@ -154,7 +191,12 @@ export function AIChatPanel() {
           alert("请先在编辑器中选中要润色的文本");
           return;
         }
-        const sys = `你是一个中文网文润色助手。保持作者文风,只改不通顺、错别字、明显病句。直接返回润色后的文本,不要解释、不要 markdown 包裹。`;
+        const chapter = chapters.find((c) => c.id === currentChapterId);
+        const sys = renderTemplate(
+          pickPrompt(templates, "polish_selection"),
+          editorSel,
+          chapter?.title ?? ""
+        );
         send(editorSel, sys, "polish-selection", editorSel);
       },
     },
@@ -164,7 +206,11 @@ export function AIChatPanel() {
       action: () => {
         const chapter = chapters.find((c) => c.id === currentChapterId);
         if (!chapter) return;
-        const sys = `你是一个中文网文润色助手。保持作者文风,只改不通顺、错别字、明显病句。直接返回润色后的全文,不要解释。`;
+        const sys = renderTemplate(
+          pickPrompt(templates, "polish_chapter"),
+          chapter.content,
+          chapter.title
+        );
         send(chapter.content, sys, "polish-chapter", chapter.content);
       },
     },
@@ -175,13 +221,24 @@ export function AIChatPanel() {
         const chapter = chapters.find((c) => c.id === currentChapterId);
         if (!chapter) return;
         const context = chapter.content.slice(-500);
-        const sys = `你是中文网文续写助手。基于用户给的正文续写约 200 字,保持文风一致,情节连贯。只返回续写内容,不要解释。`;
+        const sys = renderTemplate(
+          pickPrompt(templates, "continue_write"),
+          context,
+          chapter.title
+        );
         send(context, sys, "continue", context);
       },
     },
     {
       label: "🎭 角色建议",
-      action: () => send("基于常见网文模式,给我 3 个有张力的主角人设方向,每个 50 字以内", `你是网文编辑,擅长角色设计。`, "general"),
+      action: () => {
+        const sys = pickPrompt(templates, "character_design");
+        send(
+          "基于常见网文模式,给我 3 个有张力的主角人设方向,每个 50 字以内",
+          sys,
+          "general"
+        );
+      },
     },
   ];
 

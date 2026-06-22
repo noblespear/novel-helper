@@ -59,9 +59,17 @@ export interface ProviderConfig {
   model: string;
 }
 
+export interface PromptTemplates {
+  polish_selection: string;
+  polish_chapter: string;
+  continue_write: string;
+  character_design: string;
+  general_chat: string;
+}
+
 export interface AISettings {
   config: ProviderConfig;
-  prompt_overrides: unknown;
+  prompt_templates: PromptTemplates;
 }
 
 export interface ChatMessage {

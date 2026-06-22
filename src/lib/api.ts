@@ -7,6 +7,7 @@ import type {
   Project,
   ProjectSummary,
   ProviderConfig,
+  PromptTemplates,
   AISettings,
   ChatMessage,
   ChatChunk,
@@ -50,6 +51,9 @@ export const api = {
     invoke<ProviderConfig>("update_ai_config", { newConfig }),
   listAIModels: () => invoke<string[]>("list_ai_models"),
   validateAIKey: () => invoke<boolean>("validate_ai_key"),
+  getPromptTemplates: () => invoke<PromptTemplates>("get_prompt_templates"),
+  updatePromptTemplates: (templates: PromptTemplates) =>
+    invoke<void>("update_prompt_templates", { templates }),
   aiChatStream: (
     messages: ChatMessage[],
     onChunk: (chunk: ChatChunk) => void,

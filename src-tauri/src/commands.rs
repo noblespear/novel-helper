@@ -169,7 +169,7 @@ pub fn get_ai_settings(ai_state: State<AIState>) -> AISettings {
     let s = ai_state.settings.lock().unwrap();
     AISettings {
         config: s.config.clone(),
-        prompt_overrides: s.prompt_overrides.clone(),
+        prompt_templates: s.prompt_templates.clone(),
     }
 }
 
@@ -236,4 +236,21 @@ pub async fn ai_chat_stream(
             }),
         )
         .await
+}
+
+/// 获取提示词模板
+#[tauri::command]
+pub fn get_prompt_templates(
+    ai_state: State<'_, AIState>,
+) -> Result<crate::ai_state::PromptTemplates, String> {
+    Ok(ai_state.get_prompt_templates())
+}
+
+/// 更新提示词模板
+#[tauri::command]
+pub fn update_prompt_templates(
+    ai_state: State<'_, AIState>,
+    templates: crate::ai_state::PromptTemplates,
+) -> Result<(), String> {
+    ai_state.update_prompt_templates(templates)
 }
