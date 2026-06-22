@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../stores/app";
 import { api } from "../lib/api";
+import { getEditorApi } from "../lib/editorBridge";
+import { DiffView } from "./DiffView";
 import type { ChatMessage } from "../types";
 
 interface Message {
@@ -11,15 +13,28 @@ interface Message {
   content: string;
   streaming?: boolean;
   timestamp: number;
+  // 润色/续写专用: 与该回复关联的原始文本
+  polishOriginal?: string;
+  polishKind?: "polish-selection" | "polish-chapter" | "continue" | "general";
 }
 
 export function AIChatPanel() {
-  const { currentChapterId, currentProjectId, chapters, aiConfig } = useAppStore();
+  const { currentChapterId, chapters, aiConfig, setRightPanel } = useAppStore();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [tokens, setTokens] = useState(0);
+  const [selection, setSelection] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
+
+  // 定时轮询编辑器选区(只在 chat 面板挂载期间)
+  useEffect(() => {
+    const id = setInterval(() => {
+      const sel = getEditorApi()?.getSelection() ?? "";
+      setSelection(sel);
+    }, 400);
+    return () => clearInterval(id);
+  }, []);
 
   // 自动滚到底
   useEffect(() => {
@@ -28,7 +43,12 @@ export function AIChatPanel() {
     }
   }, [messages]);
 
-  const send = async (text?: string, systemPrompt?: string) => {
+  const send = async (
+    text?: string,
+    systemPrompt?: string,
+    polishKind?: Message["polishKind"],
+    polishOriginal?: string
+  ) => {
     const content = (text ?? input).trim();
     if (!content || busy) return;
 
@@ -62,7 +82,15 @@ export function AIChatPanel() {
     const assistantId = `msg-${Date.now()}-ai`;
     setMessages((prev) => [
       ...prev,
-      { id: assistantId, role: "assistant", content: "", streaming: true, timestamp: Date.now() },
+      {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        streaming: true,
+        timestamp: Date.now(),
+        polishKind,
+        polishOriginal,
+      },
     ]);
 
     try {
@@ -118,26 +146,42 @@ export function AIChatPanel() {
 
   const quickPrompts = [
     {
+      label: "🎯 润色选区",
+      requiresSelection: true,
+      action: () => {
+        const editorSel = getEditorApi()?.getSelection() ?? "";
+        if (!editorSel.trim()) {
+          alert("请先在编辑器中选中要润色的文本");
+          return;
+        }
+        const sys = `你是一个中文网文润色助手。保持作者文风,只改不通顺、错别字、明显病句。直接返回润色后的文本,不要解释、不要 markdown 包裹。`;
+        send(editorSel, sys, "polish-selection", editorSel);
+      },
+    },
+    {
       label: "📝 润色本章",
+      requiresChapter: true,
       action: () => {
         const chapter = chapters.find((c) => c.id === currentChapterId);
         if (!chapter) return;
         const sys = `你是一个中文网文润色助手。保持作者文风,只改不通顺、错别字、明显病句。直接返回润色后的全文,不要解释。`;
-        send(chapter.content, sys);
+        send(chapter.content, sys, "polish-chapter", chapter.content);
       },
     },
     {
       label: "➡️ 续写 200 字",
+      requiresChapter: true,
       action: () => {
         const chapter = chapters.find((c) => c.id === currentChapterId);
         if (!chapter) return;
-        const sys = `你是中文网文续写助手。基于用户给的正文续写约 200 字,保持文风一致,情节连贯。只返回续写内容。`;
-        send(chapter.content.slice(-500), sys);
+        const context = chapter.content.slice(-500);
+        const sys = `你是中文网文续写助手。基于用户给的正文续写约 200 字,保持文风一致,情节连贯。只返回续写内容,不要解释。`;
+        send(context, sys, "continue", context);
       },
     },
     {
       label: "🎭 角色建议",
-      action: () => send("基于常见网文模式,给我 3 个有张力的主角人设方向,每个 50 字以内", `你是网文编辑,擅长角色设计。`),
+      action: () => send("基于常见网文模式,给我 3 个有张力的主角人设方向,每个 50 字以内", `你是网文编辑,擅长角色设计。`, "general"),
     },
   ];
 
@@ -181,18 +225,61 @@ export function AIChatPanel() {
                     : "none",
               }}
             >
-              {m.content || (m.streaming ? "思考中..." : "")}
-              {m.streaming && m.content && (
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: 6,
-                    height: 12,
-                    background: "var(--color-accent)",
-                    marginLeft: 4,
-                    animation: "blink 1s infinite",
+              {m.role === "assistant" &&
+              m.polishKind &&
+              m.polishKind !== "general" &&
+              m.polishOriginal &&
+              !m.streaming &&
+              m.content ? (
+                <DiffView
+                  title={
+                    m.polishKind === "polish-selection"
+                      ? "选区润色建议"
+                      : m.polishKind === "polish-chapter"
+                      ? "本章润色建议"
+                      : "续写建议"
+                  }
+                  original={m.polishOriginal}
+                  revised={m.content}
+                  onAccept={() => {
+                    const api = getEditorApi();
+                    if (!api) return;
+                    if (m.polishKind === "polish-selection") {
+                      api.replaceSelection(m.content);
+                    } else if (m.polishKind === "polish-chapter") {
+                      // 危险操作:先确认
+                      if (confirm("确认用 AI 建议替换整章内容?\n建议先复制到备份再确认。")) {
+                        api.setFullText(m.content);
+                      }
+                    } else if (m.polishKind === "continue") {
+                      api.insertAtCursor(m.content);
+                    }
+                  }}
+                  onReject={() => {
+                    // 标记为已拒绝:把消息内容替换为简短说明
+                    setMessages((prev) =>
+                      prev.map((x) =>
+                        x.id === m.id ? { ...x, content: `(${x.polishKind} 已拒绝)`, polishKind: "general" } : x
+                      )
+                    );
                   }}
                 />
+              ) : (
+                <>
+                  {m.content || (m.streaming ? "思考中..." : "")}
+                  {m.streaming && m.content && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: 6,
+                        height: 12,
+                        background: "var(--color-accent)",
+                        marginLeft: 4,
+                        animation: "blink 1s infinite",
+                      }}
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -204,17 +291,33 @@ export function AIChatPanel() {
         className="px-3 py-2 border-t flex gap-1.5 overflow-x-auto"
         style={{ borderColor: "var(--color-border)" }}
       >
-        {quickPrompts.map((p) => (
-          <button
-            key={p.label}
-            onClick={p.action}
-            disabled={busy || !currentChapterId}
-            className="btn text-xs px-2 py-1 whitespace-nowrap"
-            title={!currentChapterId ? "先选择章节" : ""}
-          >
-            {p.label}
-          </button>
-        ))}
+        {quickPrompts.map((p) => {
+          const isSelection = "requiresSelection" in p && p.requiresSelection;
+          const isChapter = "requiresChapter" in p && p.requiresChapter;
+          const isSel = isSelection && selection.trim().length > 0;
+          const disabled = busy || (isSelection ? !isSel : !currentChapterId);
+          return (
+            <button
+              key={p.label}
+              onClick={p.action}
+              disabled={disabled}
+              className="btn text-xs px-2 py-1 whitespace-nowrap"
+              style={{
+                borderColor: isSel ? "var(--color-accent)" : undefined,
+                color: isSel ? "var(--color-accent)" : undefined,
+              }}
+              title={
+                isSelection && !isSel
+                  ? "先在编辑器中选中文本"
+                  : isChapter && !currentChapterId
+                  ? "先选择章节"
+                  : ""
+              }
+            >
+              {p.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Input */}

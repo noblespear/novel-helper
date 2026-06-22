@@ -1,7 +1,7 @@
 // 编辑器(基于 CodeMirror 6)
 
 import { useEffect, useRef, useState } from "react";
-import CodeMirror from "@uiw/react-codemirror";
+import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -9,6 +9,7 @@ import { EditorView } from "@codemirror/view";
 import { useAppStore } from "../stores/app";
 import { api } from "../lib/api";
 import { countWords, formatNumber } from "../lib/utils";
+import { registerEditor, unregisterEditor, type EditorApi } from "../lib/editorBridge";
 import type { FontFamily } from "../types";
 
 interface EditorProps {
@@ -25,6 +26,7 @@ export function Editor({ projectId }: EditorProps) {
   const [saving, setSaving] = useState(false);
   const saveTimer = useRef<number | null>(null);
   const lastSavedContent = useRef("");
+  const cmRef = useRef<ReactCodeMirrorRef>(null);
 
   const current = chapters.find((c) => c.id === currentChapterId);
   const isDark = theme === "dark";
@@ -54,6 +56,52 @@ export function Editor({ projectId }: EditorProps) {
       cancelled = true;
     };
   }, [projectId, currentChapterId]);
+
+  // 注册全局编辑器 API
+  useEffect(() => {
+    const api: EditorApi = {
+      getSelection: () => {
+        const view = cmRef.current?.view;
+        if (!view) return "";
+        const sel = view.state.selection.main;
+        return sel.empty ? "" : view.state.doc.sliceString(sel.from, sel.to);
+      },
+      replaceSelection: (text: string) => {
+        const view = cmRef.current?.view;
+        if (!view) return;
+        const sel = view.state.selection.main;
+        view.dispatch({
+          changes: { from: sel.from, to: sel.to, insert: text },
+          selection: { anchor: sel.from + text.length },
+        });
+        view.focus();
+      },
+      insertAtCursor: (text: string) => {
+        const view = cmRef.current?.view;
+        if (!view) return;
+        const sel = view.state.selection.main;
+        view.dispatch({
+          changes: { from: sel.from, to: sel.to, insert: text },
+          selection: { anchor: sel.from + text.length },
+        });
+        view.focus();
+      },
+      getFullText: () => content,
+      setFullText: (text: string) => {
+        setContent(text);
+        const view = cmRef.current?.view;
+        if (view) {
+          view.dispatch({
+            changes: { from: 0, to: view.state.doc.length, insert: text },
+          });
+          view.focus();
+        }
+      },
+      focus: () => cmRef.current?.view?.focus(),
+    };
+    registerEditor(api);
+    return () => unregisterEditor();
+  }, [content]);
 
   // 自动保存(2 秒防抖)
   useEffect(() => {
@@ -121,6 +169,7 @@ export function Editor({ projectId }: EditorProps) {
       <div className="flex-1 overflow-auto bg-elevated">
         <div className="max-w-3xl mx-auto py-6">
           <CodeMirror
+            ref={cmRef}
             value={content}
             onChange={(v) => setContent(v)}
             theme={isDark ? oneDark : "light"}

@@ -213,11 +213,11 @@ fn mock_respond(input: &str) -> String {
     let input_lower = input.to_lowercase();
 
     if input_lower.contains("润色") || input_lower.contains("polish") {
-        return "这是一段经过润色的文本。\n\n我尝试保持原文的叙事节奏和人物语气,只对个别不通顺的地方做了微调。\n\n你可以对比原文与润色版,选择接受或拒绝这次润色建议。".to_string();
+        return mock_polish(input);
     }
 
     if input_lower.contains("续写") || input_lower.contains("continue") {
-        return "他抬起头,目光穿过薄薄的雾气,落在了远处那座古旧的山门上。\n\n走吧,他低声说,答案在里面。\n\n身后,脚步声紧随而来。".to_string();
+        return "他抬起头,目光穿过薄薄的雾气,落在了远处那座古旧的山门上。\n\n\"走吧,\"他低声说,\"答案在里面。\"\n\n身后,脚步声紧随而来。".to_string();
     }
 
     let preview: String = if input.chars().count() > 100 {
@@ -230,6 +230,41 @@ fn mock_respond(input: &str) -> String {
         "(Mock 响应)\n\n你说了:{}\n\n这是一个模拟回复。要使用真实 AI,请在设置中配置 API Key。",
         preview
     )
+}
+
+/// Mock 润色:对短输入做可见的字词替换,方便在 diff 视图中看到绿色新增/红色删除
+fn mock_polish(input: &str) -> String {
+    let mut s = input.to_string();
+    let replacements: &[(&str, &str)] = &[
+        ("我", "在下"),
+        ("你", "汝"),
+        ("他", "他"),
+        ("她", "她"),
+        ("我们", "我等"),
+        ("很", "极为"),
+        ("非常", "甚为"),
+        ("说", "言道"),
+        ("说:", "言道:"),
+        ("说:", "言道:"),
+        ("道:", "言道:"),
+        ("道:", "言道:"),
+        ("说。", "言罢。"),
+        ("了。", "了。"),
+        ("走", "迈步而去"),
+        ("看", "望"),
+        ("想", "思忖"),
+        ("知道", "心知"),
+        ("现在", "此刻"),
+        ("然后", "继而"),
+        ("但是", "然而"),
+        ("因为", "缘何"),
+    ];
+    for (from, to) in replacements {
+        if s.contains(from) {
+            s = s.replace(from, to);
+        }
+    }
+    s
 }
 
 fn split_into_chunks(s: &str, n: usize) -> Vec<String> {
@@ -531,5 +566,186 @@ impl AIProvider for AnthropicProvider {
             "claude-3-5-haiku-20241022".to_string(),
             "claude-3-opus-20240229".to_string(),
         ])
+    }
+}
+
+// =================== Tests ===================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    fn collect_chunks(s: &str) -> Vec<String> {
+        let _ = s; // 保留 helper 占位
+        Vec::new()
+    }
+
+    #[test]
+    fn chat_message_constructors() {
+        let m = ChatMessage::system("sys");
+        assert_eq!(m.role, "system");
+        assert_eq!(m.content, "sys");
+
+        let m = ChatMessage::user("hi");
+        assert_eq!(m.role, "user");
+
+        let m = ChatMessage::assistant("hello");
+        assert_eq!(m.role, "assistant");
+    }
+
+    #[test]
+    fn chat_request_default() {
+        let r = ChatRequest::default();
+        assert_eq!(r.temperature, 0.7);
+        assert_eq!(r.max_tokens, 2000);
+        assert!(r.stream);
+        assert!(r.messages.is_empty());
+    }
+
+    #[test]
+    fn mock_polish_demonstrates_diff() {
+        let original = "我走了很远的路,知道前面有危险。";
+        let polished = mock_polish(original);
+        // 替换发生了
+        assert!(polished.contains("在下") || polished.contains("迈步") || polished.contains("心知"));
+        // 保留了一些原文
+        assert!(polished.contains("前") || polished.contains("危险"));
+    }
+
+    #[test]
+    fn mock_polish_passthrough_for_chinese() {
+        let original = "天空很蓝,白云朵朵。";
+        let polished = mock_polish(original);
+        // 至少一处替换
+        assert!(polished != original);
+    }
+
+    #[test]
+    fn mock_continue_returns_continuation() {
+        let resp = mock_respond("续写:他站在门前");
+        assert!(resp.contains("他抬起头") || resp.contains("言道"));
+    }
+
+    #[test]
+    fn mock_general_response() {
+        let resp = mock_respond("今天天气如何?");
+        assert!(resp.contains("Mock"));
+    }
+
+    #[test]
+    fn split_into_chunks_basic() {
+        let chunks = split_into_chunks("hello world", 2);
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0], "hello ");
+        assert_eq!(chunks[1], "world");
+    }
+
+    #[test]
+    fn split_into_chunks_empty() {
+        let chunks = split_into_chunks("", 4);
+        assert!(chunks.is_empty());
+    }
+
+    #[test]
+    fn split_into_chunks_chinese() {
+        let chunks = split_into_chunks("你好世界你好世界", 4);
+        // 中文按字符分割,不破坏
+        let joined: String = chunks.join("");
+        assert_eq!(joined, "你好世界你好世界");
+    }
+
+    #[test]
+    fn provider_config_default_is_mock() {
+        let c = ProviderConfig::default();
+        assert_eq!(c.provider_type, "mock");
+        assert_eq!(c.model, "deepseek-chat");
+    }
+
+    #[tokio::test]
+    async fn mock_provider_streams_chunks() {
+        use std::sync::Arc;
+        let p = MockProvider::new();
+        let collected: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let done: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+
+        let c2 = collected.clone();
+        let d2 = done.clone();
+        p.chat_stream(
+            ChatRequest {
+                model: "mock".into(),
+                messages: vec![
+                    ChatMessage::system("润色助手"),
+                    ChatMessage::user("我走了很远的路"),
+                ],
+                ..Default::default()
+            },
+            Box::new(move |chunk| {
+                if chunk.done {
+                    *d2.lock().unwrap() = true;
+                } else {
+                    c2.lock().unwrap().push(chunk.content);
+                }
+            }),
+        )
+        .await
+        .unwrap();
+
+        assert!(*done.lock().unwrap(), "stream should terminate with done=true");
+        let joined: String = collected.lock().unwrap().join("");
+        assert!(!joined.is_empty(), "streamed content should not be empty");
+    }
+
+    #[tokio::test]
+    async fn mock_provider_lists_three_models() {
+        let p = MockProvider::new();
+        let models = p.list_models().await.unwrap();
+        assert_eq!(models.len(), 3);
+        assert!(models[0].starts_with("mock-"));
+    }
+
+    #[tokio::test]
+    async fn mock_provider_validates_always_true() {
+        let p = MockProvider::new();
+        assert!(p.validate().await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn registry_routes_to_mock_by_default() {
+        let reg = ProviderRegistry::new(ProviderConfig::default());
+        let models = reg.list_models().await.unwrap();
+        assert!(!models.is_empty());
+    }
+
+    #[tokio::test]
+    async fn registry_routes_to_anthropic() {
+        let cfg = ProviderConfig {
+            provider_type: "anthropic".into(),
+            api_key: "test".into(),
+            base_url: "".into(),
+            model: "claude-3-5-sonnet-20241022".into(),
+        };
+        let reg = ProviderRegistry::new(cfg);
+        let models = reg.list_models().await.unwrap();
+        assert!(models.iter().any(|m| m.contains("claude")));
+    }
+
+    #[tokio::test]
+    async fn registry_routes_to_openai_compatible() {
+        let cfg = ProviderConfig {
+            provider_type: "openai".into(),
+            api_key: "test".into(),
+            base_url: "https://api.deepseek.com".into(),
+            model: "deepseek-chat".into(),
+        };
+        let reg = ProviderRegistry::new(cfg);
+        assert_eq!(reg.config().base_url, "https://api.deepseek.com");
+    }
+
+    #[test]
+    fn usage_serialization() {
+        let u = Usage { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 };
+        let json = serde_json::to_string(&u).unwrap();
+        assert!(json.contains("\"total_tokens\":30"));
     }
 }

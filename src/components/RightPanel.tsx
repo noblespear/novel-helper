@@ -58,27 +58,27 @@ export function RightPanel() {
 
 function OutlinePanel() {
   return (
-    <div className="text-muted p-4">
-      <p className="mb-2">📋 章节大纲</p>
-      <p className="text-xs">P0 阶段:仅占位,P2 阶段实现细纲编辑</p>
+    <div className="p-4">
+      <p className="mb-2 text-default">📋 章节大纲</p>
+      <p className="text-xs text-muted">P1 阶段:仅占位,P2 阶段实现细纲编辑</p>
     </div>
   );
 }
 
 function CharacterPanel() {
   return (
-    <div className="text-muted p-4">
-      <p className="mb-2">👤 当前章节人物</p>
-      <p className="text-xs">P0 阶段:仅占位,P2 阶段实现角色卡</p>
+    <div className="p-4">
+      <p className="mb-2 text-default">👤 当前章节人物</p>
+      <p className="text-xs text-muted">P1 阶段:仅占位,P2 阶段实现角色卡</p>
     </div>
   );
 }
 
 function RAGPanel() {
   return (
-    <div className="text-muted p-4">
-      <p className="mb-2">🔍 全书检索</p>
-      <p className="text-xs">P0 阶段:仅占位,P3 阶段实现 RAG</p>
+    <div className="p-4">
+      <p className="mb-2 text-default">🔍 全书检索</p>
+      <p className="text-xs text-muted">P1 阶段:仅占位,P3 阶段实现 RAG</p>
     </div>
   );
 }
