@@ -11,6 +11,9 @@ import type {
   AISettings,
   ChatMessage,
   ChatChunk,
+  KbStatus,
+  SearchHit,
+  RebuildResult,
 } from "../types";
 
 export const api = {
@@ -54,6 +57,17 @@ export const api = {
   getPromptTemplates: () => invoke<PromptTemplates>("get_prompt_templates"),
   updatePromptTemplates: (templates: PromptTemplates) =>
     invoke<void>("update_prompt_templates", { templates }),
+
+  // 知识库
+  getKbStatus: (projectId: string) => invoke<KbStatus>("get_kb_status", { projectId }),
+  downloadEmbeddingModel: () => invoke<string>("download_embedding_model"),
+  rebuildKb: (projectId: string) => invoke<RebuildResult>("rebuild_kb", { projectId }),
+  searchFts: (projectId: string, query: string, limit?: number) =>
+    invoke<SearchHit[]>("search_fts", { projectId, query, limit }),
+  searchSemantic: (projectId: string, query: string, limit?: number) =>
+    invoke<SearchHit[]>("search_semantic", { projectId, query, limit }),
+  searchHybrid: (projectId: string, query: string, limit?: number) =>
+    invoke<SearchHit[]>("search_hybrid", { projectId, query, limit }),
   aiChatStream: (
     messages: ChatMessage[],
     onChunk: (chunk: ChatChunk) => void,

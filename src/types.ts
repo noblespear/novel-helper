@@ -72,6 +72,43 @@ export interface AISettings {
   prompt_templates: PromptTemplates;
 }
 
+// 知识库相关
+export interface KbMetaInfo {
+  embedding_model: string;
+  embedding_dim: number;
+  chunk_size: number;
+  chunk_overlap: number;
+  last_rebuild_ts: number;
+}
+
+export type ModelStatus =
+  | { type: "not_downloaded"; manual_path: string; hf_url: string; files: string[] }
+  | { type: "downloading"; progress: number }
+  | { type: "ready"; path: string; dim: number }
+  | { type: "error"; message: string };
+
+export interface KbStatus {
+  exists: boolean;
+  last_rebuild_ts: number;
+  chunk_count: number;
+  model_status: ModelStatus;
+  dirty: boolean;
+}
+
+export interface SearchHit {
+  chunk_id: string;
+  source: string;
+  text: string;
+  score: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface RebuildResult {
+  chunks_total: number;
+  duration_ms: number;
+  last_rebuild_ts: number;
+}
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;

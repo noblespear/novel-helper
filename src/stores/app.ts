@@ -31,8 +31,10 @@ interface AppState {
   loadAISettings: () => Promise<void>;
 
   // UI
-  rightPanel: "outline" | "character" | "ai" | "rag" | "ai-settings";
-  setRightPanel: (p: "outline" | "character" | "ai" | "rag" | "ai-settings") => void;
+  rightPanel: "outline" | "character" | "ai" | "rag" | "kb" | "ai-settings";
+  setRightPanel: (
+    p: "outline" | "character" | "ai" | "rag" | "kb" | "ai-settings"
+  ) => void;
   leftPanelVisible: boolean;
   toggleLeftPanel: () => void;
   commandPaletteOpen: boolean;

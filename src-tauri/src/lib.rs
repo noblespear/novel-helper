@@ -4,6 +4,7 @@ use tauri::Manager;
 
 mod ai;
 mod commands;
+mod kb;
 mod project;
 mod storage;
 mod ai_state;
@@ -134,6 +135,12 @@ pub fn run() {
             commands::ai_chat_stream,
             commands::get_prompt_templates,
             commands::update_prompt_templates,
+            commands::get_kb_status,
+            commands::download_embedding_model,
+            commands::rebuild_kb,
+            commands::search_fts,
+            commands::search_semantic,
+            commands::search_hybrid,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

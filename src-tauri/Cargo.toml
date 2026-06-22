@@ -33,6 +33,12 @@ async-trait = "0.1"
 futures = "0.3"
 keyring = "3.6"
 
+# Stage 1: 知识库(FTS5 + jieba)
+# 向量检索暂不在 Stage 1 启用,lance/lancedb 0.13 在当前 Rust 编译器上有递归深度限制
+# Stage 2 用 sqlite-vss 或换其他方案
+rusqlite = { version = "0.31", features = ["bundled"] }
+jieba-rs = "0.6"
+
 [profile.release]
 panic = "abort"
 codegen-units = 1

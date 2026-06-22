@@ -2,6 +2,8 @@
 
 use crate::ai::{ChatMessage, ChatRequest, ProviderConfig, ProviderRegistry};
 use crate::ai_state::{AISettings, AIState};
+use crate::kb::pipeline::{KbPaths, KbPipeline, SourceContent};
+use crate::kb::{KbMeta, KbStatus, ModelStatus, RebuildResult, SearchHit, DEFAULT_MODEL_REPO};
 use crate::project::{Project, ProjectSummary};
 use crate::storage::Storage;
 use crate::AppConfig;
@@ -254,3 +256,236 @@ pub fn update_prompt_templates(
 ) -> Result<(), String> {
     ai_state.update_prompt_templates(templates)
 }
+
+// ============================================================
+// Stage 1: 知识库 commands
+// ============================================================
+
+fn project_dir_for(config: &AppConfig, project_id: &str) -> std::path::PathBuf {
+    config.projects_dir.join("projects").join(project_id)
+}
+
+/// 获取 KB 状态
+#[tauri::command]
+pub fn get_kb_status(
+    config: State<'_, AppConfig>,
+    project_id: String,
+) -> Result<KbStatus, String> {
+    let paths = KbPaths::for_project(&project_dir_for(&config, &project_id));
+    let meta = crate::kb::pipeline::load_meta(&paths).unwrap_or_default();
+
+    let fts_count = if paths.fts_db.exists() {
+        FtsIndex::open(&paths.fts_db)
+            .ok()
+            .and_then(|idx| idx.count().ok())
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    let vector_count = if paths.vector_dir.exists() {
+        VectorIndex::open(&paths.vector_dir)
+            .ok()
+            .and_then(|idx| idx.count().ok())
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    let chunk_count = fts_count.max(vector_count);
+
+    let model_status = if meta.model_local_path.as_os_str().is_empty()
+        || !meta.model_local_path.exists()
+    {
+        let user_data = config
+            .projects_dir
+            .parent()
+            .unwrap_or(&config.projects_dir);
+        crate::kb::downloader::manual_path_info(user_data, &meta.embedding_model)
+    } else {
+        ModelStatus::Ready {
+            path: meta.model_local_path.clone(),
+            dim: meta.embedding_dim,
+        }
+    };
+
+    Ok(KbStatus {
+        exists: chunk_count > 0,
+        last_rebuild_ts: meta.last_rebuild_ts,
+        chunk_count,
+        model_status,
+        dirty: false, // TODO: track dirty flag per project
+    })
+}
+
+/// 下载 embedding 模型
+#[tauri::command]
+pub async fn download_embedding_model(
+    config: State<'_, AppConfig>,
+) -> Result<String, String> {
+    let user_data = config
+        .projects_dir
+        .parent()
+        .unwrap_or(&config.projects_dir);
+    match crate::kb::downloader::try_download(DEFAULT_MODEL_REPO, user_data).await {
+        Ok(path) => Ok(path.to_string_lossy().to_string()),
+        Err(status) => match status {
+            ModelStatus::NotDownloaded { manual_path, .. } => Err(format!(
+                "模型下载失败。请手动从 https://huggingface.co/BAAI/bge-small-zh-v1.5 下载以下文件到 {}:\n  - model.onnx\n  - tokenizer.json",
+                manual_path.display()
+            )),
+            _ => Err(format!("下载失败: {:?}", status)),
+        },
+    }
+}
+
+/// 重建知识库(全量)
+#[tauri::command]
+pub async fn rebuild_kb(
+    config: State<'_, AppConfig>,
+    project_id: String,
+) -> Result<RebuildResult, String> {
+    let project_dir = project_dir_for(&config, &project_id);
+    let paths = KbPaths::for_project(&project_dir);
+    let mut meta = crate::kb::pipeline::load_meta(&paths).unwrap_or_default();
+
+    // 确保模型就绪
+    let user_data = config
+        .projects_dir
+        .parent()
+        .unwrap_or(&config.projects_dir);
+    if meta.model_local_path.as_os_str().is_empty() || !meta.model_local_path.exists() {
+        // 尝试下载
+        match crate::kb::downloader::try_download(&meta.embedding_model, user_data).await {
+            Ok(p) => meta.model_local_path = p,
+            Err(e) => {
+                return Err(format!(
+                    "模型未就绪: {:?}\n请先在 KB 面板手动下载,或运行 download_embedding_model",
+                    e
+                ));
+            }
+        }
+    }
+
+    // 收集项目所有内容
+    let sources = collect_project_sources(&project_dir)?;
+
+    // 打开 pipeline
+    let mut kb = KbPipeline::open(paths.clone(), meta.clone())?;
+    kb.try_load_embedder()?;
+
+    // 重建
+    let result = kb.rebuild(&sources)?;
+
+    // 持久化更新后的 meta
+    crate::kb::pipeline::save_meta(&paths, &kb.meta)?;
+
+    Ok(result)
+}
+
+/// FTS5 关键词检索
+#[tauri::command]
+pub fn search_fts(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<SearchHit>, String> {
+    let paths = KbPaths::for_project(&project_dir_for(&config, &project_id));
+    let meta = crate::kb::pipeline::load_meta(&paths).unwrap_or_default();
+    let kb = KbPipeline::open(paths, meta)?;
+    kb.search_fts(&query, limit.unwrap_or(20))
+}
+
+/// 语义检索
+#[tauri::command]
+pub fn search_semantic(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<SearchHit>, String> {
+    let paths = KbPaths::for_project(&project_dir_for(&config, &project_id));
+    let meta = crate::kb::pipeline::load_meta(&paths).unwrap_or_default();
+    let mut kb = KbPipeline::open(paths, meta)?;
+    kb.try_load_embedder()?;
+    kb.search_semantic(&query, limit.unwrap_or(20))
+}
+
+/// 混合检索
+#[tauri::command]
+pub fn search_hybrid(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<SearchHit>, String> {
+    let paths = KbPaths::for_project(&project_dir_for(&config, &project_id));
+    let meta = crate::kb::pipeline::load_meta(&paths).unwrap_or_default();
+    let mut kb = KbPipeline::open(paths, meta)?;
+    let _ = kb.try_load_embedder(); // 不强制要求模型
+    kb.search_hybrid(&query, limit.unwrap_or(20))
+}
+
+/// 收集项目所有内容作为 KB source
+fn collect_project_sources(
+    project_dir: &std::path::Path,
+) -> Result<Vec<SourceContent>, String> {
+    use std::fs;
+    let mut sources = Vec::new();
+
+    // 1) 大纲
+    let outline = project_dir.join("outline.md");
+    if outline.exists() {
+        let text = fs::read_to_string(&outline).map_err(|e| e.to_string())?;
+        if !text.trim().is_empty() {
+            sources.push(SourceContent {
+                source: "outline".to_string(),
+                text,
+            });
+        }
+    }
+
+    // 2) 角色
+    let chars_file = project_dir.join("characters.json");
+    if chars_file.exists() {
+        let text = fs::read_to_string(&chars_file).map_err(|e| e.to_string())?;
+        if !text.trim().is_empty() {
+            sources.push(SourceContent {
+                source: "characters".to_string(),
+                text,
+            });
+        }
+    }
+
+    // 3) 章节
+    let chapters_dir = project_dir.join("chapters");
+    if chapters_dir.exists() {
+        for entry in walkdir::WalkDir::new(&chapters_dir)
+            .max_depth(3)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.file_name() == "content.md" {
+                let id = entry
+                    .path()
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let text = fs::read_to_string(entry.path()).unwrap_or_default();
+                if !text.trim().is_empty() {
+                    sources.push(SourceContent {
+                        source: format!("chapter:{}", id),
+                        text,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(sources)
+}
+
+// re-export for use in commands
+use crate::kb::fts::FtsIndex;
+use crate::kb::lancedb::VectorIndex;

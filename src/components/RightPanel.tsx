@@ -1,19 +1,21 @@
-// 右栏(可切换:大纲/人物/AI/RAG/AI设置)
+// 右栏(可切换:大纲/人物/AI/检索/知识库/AI设置)
 
 import { useAppStore } from "../stores/app";
 import { AIChatPanel } from "./AIChatPanel";
 import { AISettingsPanel } from "./AISettingsPanel";
+import { KnowledgeBase } from "./KnowledgeBase";
 import { cn } from "../lib/utils";
 
 const tabs = [
   { id: "outline" as const, label: "大纲", icon: "📋" },
   { id: "character" as const, label: "人物", icon: "👤" },
   { id: "ai" as const, label: "AI", icon: "🤖" },
-  { id: "rag" as const, label: "RAG", icon: "🔍" },
+  { id: "rag" as const, label: "检索", icon: "🔍" },
+  { id: "kb" as const, label: "知识库", icon: "📚" },
 ];
 
 export function RightPanel() {
-  const { rightPanel, setRightPanel } = useAppStore();
+  const { rightPanel, setRightPanel, currentProjectId } = useAppStore();
   return (
     <aside
       className="w-80 shrink-0 border-l flex flex-col"
@@ -50,6 +52,7 @@ export function RightPanel() {
         {rightPanel === "character" && <CharacterPanel />}
         {rightPanel === "ai" && <AIChatPanel />}
         {rightPanel === "rag" && <RAGPanel />}
+        {rightPanel === "kb" && currentProjectId && <KnowledgeBase projectId={currentProjectId} />}
         {rightPanel === "ai-settings" && <AISettingsPanel />}
       </div>
     </aside>
@@ -78,7 +81,7 @@ function RAGPanel() {
   return (
     <div className="p-4">
       <p className="mb-2 text-default">🔍 全书检索</p>
-      <p className="text-xs text-muted">P1 阶段:仅占位,P3 阶段实现 RAG</p>
+      <p className="text-xs text-muted">请使用顶部「知识库」标签</p>
     </div>
   );
 }
