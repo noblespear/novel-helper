@@ -10,6 +10,8 @@ import { useAppStore } from "../stores/app";
 import { api } from "../lib/api";
 import { countWords, formatNumber } from "../lib/utils";
 import { registerEditor, unregisterEditor, type EditorApi } from "../lib/editorBridge";
+import { SelectionToolbar } from "./SelectionToolbar";
+import { useSelectionAction } from "../hooks/useSelectionAction";
 import type { FontFamily } from "../types";
 
 interface EditorProps {
@@ -27,6 +29,9 @@ export function Editor({ projectId }: EditorProps) {
   const saveTimer = useRef<number | null>(null);
   const lastSavedContent = useRef("");
   const cmRef = useRef<ReactCodeMirrorRef>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const { handleAction } = useSelectionAction();
 
   const current = chapters.find((c) => c.id === currentChapterId);
   const isDark = theme === "dark";
@@ -65,6 +70,26 @@ export function Editor({ projectId }: EditorProps) {
         if (!view) return "";
         const sel = view.state.selection.main;
         return sel.empty ? "" : view.state.doc.sliceString(sel.from, sel.to);
+      },
+      getSelectionInfo: () => {
+        const view = cmRef.current?.view;
+        if (!view) return { text: "", rect: null };
+        const sel = view.state.selection.main;
+        if (sel.empty) return { text: "", rect: null };
+        const text = view.state.doc.sliceString(sel.from, sel.to);
+        // 取选区最后一个字符的客户端坐标
+        const coords = view.coordsAtPos(sel.to);
+        if (!coords) return { text, rect: null };
+        // 找到 view 的滚动容器(.cm-scroller),以它为基准
+        const scroller = view.scrollDOM;
+        const scrollerRect = scroller.getBoundingClientRect();
+        const rect = {
+          top: coords.top - scrollerRect.top + scroller.scrollTop,
+          left: coords.left - scrollerRect.left + scroller.scrollLeft,
+          width: coords.right - coords.left,
+          height: coords.bottom - coords.top,
+        };
+        return { text, rect };
       },
       replaceSelection: (text: string) => {
         const view = cmRef.current?.view;
@@ -166,7 +191,7 @@ export function Editor({ projectId }: EditorProps) {
         </span>
       </div>
 
-      <div className="flex-1 overflow-auto bg-elevated">
+      <div ref={scrollerRef} className="flex-1 overflow-auto bg-elevated relative">
         <div className="max-w-3xl mx-auto py-6">
           <CodeMirror
             ref={cmRef}
@@ -196,7 +221,39 @@ export function Editor({ projectId }: EditorProps) {
             placeholder="开始你的故事..."
           />
         </div>
+        <SelectionToolbar
+          scrollContainerRef={scrollerRef}
+          onAction={async (action, text) => {
+            if (action === "copy") {
+              const r = await handleAction(action, text);
+              if (r) setToast("已复制到剪贴板");
+            } else {
+              setToast(`AI 正在${action === "polish" ? "润色" : action === "continue" ? "续写" : "改写"}…`);
+              const r = await handleAction(action, text);
+              if (r) {
+                r.apply(action === "continue" ? "insert" : "replace");
+                setToast("✓ 已应用");
+              } else {
+                setToast("✗ 操作失败");
+              }
+            }
+            setTimeout(() => setToast(null), 2000);
+          }}
+        />
       </div>
+      {toast && (
+        <div
+          className="absolute bottom-16 left-1/2 transform -translate-x-1/2 px-3 py-1.5 rounded text-sm shadow-lg"
+          style={{
+            background: "var(--color-elevated)",
+            color: "var(--color-text)",
+            border: "1px solid var(--color-border)",
+            zIndex: 1100,
+          }}
+        >
+          {toast}
+        </div>
+      )}
 
       <div
         className="px-6 py-1.5 border-t flex items-center justify-between text-xs text-muted"

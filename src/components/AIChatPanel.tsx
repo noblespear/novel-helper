@@ -17,6 +17,8 @@ const DEFAULT_PROMPTS: PromptTemplates = {
   character_design: "你是网文编辑,擅长角色设计。",
   general_chat:
     "你是一个中文网文写作助手,帮作者构思、答疑、激发灵感。回答简洁有针对性,优先给可执行的具体建议。",
+  rewrite:
+    "你是中文网文改写助手。保持原意,把用户给的文本换一种更生动的表达方式重写,保留关键情节,只调整文笔、句式、视角细节。直接返回改写后的文本,不要解释。",
 };
 
 function renderTemplate(tpl: string, text: string, chapterTitle: string): string {

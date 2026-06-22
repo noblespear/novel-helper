@@ -65,6 +65,7 @@ export interface PromptTemplates {
   continue_write: string;
   character_design: string;
   general_chat: string;
+  rewrite: string;
 }
 
 export interface AISettings {
