@@ -16,8 +16,8 @@ export function RightPanel() {
   const { rightPanel, setRightPanel } = useAppStore();
   return (
     <aside
-      className="w-80 border-l flex flex-col"
-      style={{ borderColor: "var(--color-border)" }}
+      className="w-80 shrink-0 border-l flex flex-col"
+      style={{ borderColor: "var(--color-border)", background: "var(--color-bg)" }}
     >
       <div
         className="flex border-b"

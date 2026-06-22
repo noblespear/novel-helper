@@ -85,7 +85,7 @@ export default function App() {
   const renderMain = () => {
     if (view === "home" || !currentProjectId) {
       return (
-        <div className="flex-1 flex">
+        <div className="flex-1 flex min-w-0">
           <ProjectList onOpenProject={onOpenProject} />
           {!immersive && <RightPanel />}
         </div>
@@ -93,10 +93,10 @@ export default function App() {
     }
     if (view === "writing") {
       return (
-        <div className="flex-1 flex">
+        <div className="flex-1 flex min-w-0">
           {!immersive && (
             <div
-              className="w-60 border-r"
+              className="w-60 shrink-0 border-r"
               style={{ borderColor: "var(--color-border)" }}
             >
               <ChapterTree projectId={currentProjectId} />
@@ -108,7 +108,7 @@ export default function App() {
       );
     }
     return (
-      <div className="flex-1 flex">
+      <div className="flex-1 flex min-w-0">
         <Placeholder
           title={view}
           message="P0 阶段:此功能为占位,P1/P2 阶段实现"

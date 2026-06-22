@@ -54,7 +54,10 @@ export function ProjectList({ onOpenProject }: ProjectListProps) {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-8">
+    <div
+      className="flex-1 min-w-0 overflow-auto p-8"
+      style={{ background: "var(--color-bg)" }}
+    >
       <div className="max-w-6xl mx-auto">
         <header className="mb-8 flex items-end justify-between">
           <div>

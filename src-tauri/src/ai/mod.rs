@@ -105,17 +105,16 @@ pub trait AIProvider: Send + Sync {
 /// Provider 注册表
 pub struct ProviderRegistry {
     inner: Arc<dyn AIProvider>,
-    config: ProviderConfig,
 }
 
 impl ProviderRegistry {
     pub fn new(config: ProviderConfig) -> Self {
         let inner: Arc<dyn AIProvider> = match config.provider_type.as_str() {
-            "openai" | "openai_compatible" => Arc::new(OpenAIProvider::new(config.clone())),
-            "anthropic" => Arc::new(AnthropicProvider::new(config.clone())),
+            "openai" | "openai_compatible" => Arc::new(OpenAIProvider::new(config)),
+            "anthropic" => Arc::new(AnthropicProvider::new(config)),
             _ => Arc::new(MockProvider::new()),
         };
-        Self { inner, config }
+        Self { inner }
     }
 
     pub async fn chat_stream(
@@ -124,10 +123,6 @@ impl ProviderRegistry {
         on_chunk: Box<dyn Fn(ChatChunk) + Send + Sync>,
     ) -> Result<(), String> {
         self.inner.chat_stream(req, on_chunk).await
-    }
-
-    pub fn config(&self) -> &ProviderConfig {
-        &self.config
     }
 
     pub async fn list_models(&self) -> Result<Vec<String>, String> {
@@ -140,15 +135,11 @@ impl ProviderRegistry {
 }
 
 // =================== Mock Provider ===================
-pub struct MockProvider {
-    counter: Arc<std::sync::atomic::AtomicUsize>,
-}
+pub struct MockProvider;
 
 impl MockProvider {
     pub fn new() -> Self {
-        Self {
-            counter: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
-        }
+        Self
     }
 }
 
@@ -738,8 +729,7 @@ mod tests {
             base_url: "https://api.deepseek.com".into(),
             model: "deepseek-chat".into(),
         };
-        let reg = ProviderRegistry::new(cfg);
-        assert_eq!(reg.config().base_url, "https://api.deepseek.com");
+        let _ = ProviderRegistry::new(cfg);
     }
 
     #[test]

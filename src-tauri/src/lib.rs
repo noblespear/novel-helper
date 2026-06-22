@@ -133,17 +133,6 @@ pub fn run() {
             commands::validate_ai_key,
             commands::ai_chat_stream,
         ])
-        .invoke_handler(tauri::generate_handler![
-            commands::create_project,
-            commands::list_projects,
-            commands::open_project,
-            commands::delete_project,
-            commands::save_chapter,
-            commands::load_chapter,
-            commands::list_chapters,
-            commands::create_chapter,
-            commands::delete_chapter,
-        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
