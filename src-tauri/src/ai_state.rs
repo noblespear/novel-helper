@@ -53,11 +53,16 @@ impl AIState {
 
     pub fn update_config(&self, new_config: ProviderConfig) -> Result<(), String> {
         let mut s = self.settings.lock().unwrap();
-        // 单独存 API key 到 keyring
+        // 单独存 API key 到 keyring(只在非空时写)
         if !new_config.api_key.is_empty() {
             write_key_to_keyring(&new_config.api_key).map_err(|e| e.to_string())?;
         }
-        s.config = new_config;
+        // 关键:如果前端没传新 key,保留内存和 keyring 里的旧 key
+        let mut merged = new_config;
+        if merged.api_key.is_empty() {
+            merged.api_key = s.config.api_key.clone();
+        }
+        s.config = merged;
         // 配置文件(不存 API key,只存其他)
         let mut persist = s.clone();
         persist.config.api_key = String::new();

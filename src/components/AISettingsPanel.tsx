@@ -61,7 +61,8 @@ export function AISettingsPanel() {
       setProviderType(aiConfig.provider_type);
       setBaseUrl(aiConfig.base_url);
       setModel(aiConfig.model);
-      // api_key 不回显(从 keyring 读取,后端不应该返回明文)
+      // 标记 keyring 里有 key(用于 UI 提示)
+      setApiKey(aiConfig.api_key || "");
     }
   }, [aiConfig]);
 
