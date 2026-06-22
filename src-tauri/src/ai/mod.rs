@@ -319,9 +319,11 @@ impl AIProvider for OpenAIProvider {
 
         match resp {
             Ok(r) if r.status().is_success() => {
+                eprintln!("[openai] status {}, starting stream", r.status());
                 use futures::StreamExt;
                 let mut stream = r.bytes_stream();
                 let mut buffer = String::new();
+                let mut chunk_count = 0;
                 while let Some(chunk) = stream.next().await {
                     if let Ok(bytes) = chunk {
                         buffer.push_str(&String::from_utf8_lossy(&bytes));
@@ -331,6 +333,7 @@ impl AIProvider for OpenAIProvider {
                             for line in event.lines() {
                                 if let Some(data) = line.strip_prefix("data: ") {
                                     if data == "[DONE]" {
+                                        eprintln!("[openai] stream done after {} chunks", chunk_count);
                                         on_chunk(ChatChunk {
                                             content: String::new(),
                                             done: true,
@@ -346,6 +349,7 @@ impl AIProvider for OpenAIProvider {
                                             .unwrap_or("")
                                             .to_string();
                                         if !content.is_empty() {
+                                            chunk_count += 1;
                                             on_chunk(ChatChunk {
                                                 content,
                                                 done: false,
@@ -358,19 +362,40 @@ impl AIProvider for OpenAIProvider {
                         }
                     }
                 }
+                eprintln!("[openai] stream ended with {} chunks (no [DONE])", chunk_count);
+                // Stream ended without [DONE] — still signal completion
+                on_chunk(ChatChunk {
+                    content: String::new(),
+                    done: true,
+                    usage: None,
+                });
             }
             Ok(r) => {
                 let status = r.status();
                 let text = r.text().await.unwrap_or_default();
+                eprintln!("[openai] error status {} body: {}", status, &text[..text.len().min(200)]);
+                // 先发错误内容(done: false 让前端累加)
                 on_chunk(ChatChunk {
                     content: format!("[错误 {}] {}", status, text),
+                    done: false,
+                    usage: None,
+                });
+                // 再发结束信号
+                on_chunk(ChatChunk {
+                    content: String::new(),
                     done: true,
                     usage: None,
                 });
             }
             Err(e) => {
+                eprintln!("[openai] network error: {}", e);
                 on_chunk(ChatChunk {
                     content: format!("[网络错误] {}", e),
+                    done: false,
+                    usage: None,
+                });
+                on_chunk(ChatChunk {
+                    content: String::new(),
                     done: true,
                     usage: None,
                 });

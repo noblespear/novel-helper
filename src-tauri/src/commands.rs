@@ -224,7 +224,15 @@ pub async fn ai_chat_stream(
         .chat_stream(
             req,
             Box::new(move |chunk| {
-                let _ = on_chunk.send(chunk);
+                eprintln!(
+                    "[cmd] sending chunk: done={} content_len={}",
+                    chunk.done,
+                    chunk.content.len()
+                );
+                match on_chunk.send(chunk) {
+                    Ok(_) => eprintln!("[cmd] chunk sent OK"),
+                    Err(e) => eprintln!("[cmd] chunk send FAILED: {}", e),
+                }
             }),
         )
         .await

@@ -101,7 +101,7 @@ export function AIChatPanel() {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantId
-                  ? { ...m, content: m.content, streaming: false }
+                  ? { ...m, content: m.content + chunk.content, streaming: false }
                   : m
               )
             );
@@ -266,7 +266,10 @@ export function AIChatPanel() {
                 />
               ) : (
                 <>
-                  {m.content || (m.streaming ? "思考中..." : "")}
+                  {m.content ||
+                    (m.streaming
+                      ? "思考中..."
+                      : <span style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>(空响应 — 检查 AI 设置 / 网络 / API Key)</span>)}
                   {m.streaming && m.content && (
                     <span
                       style={{
@@ -330,9 +333,7 @@ export function AIChatPanel() {
           placeholder={
             !aiConfig
               ? "请先在设置中配置 AI"
-              : currentChapterId
-              ? "输入消息... (Shift+Enter 换行)"
-              : "先选择章节"
+              : "输入消息... (Shift+Enter 换行,Enter 发送)"
           }
           value={input}
           onChange={(e) => setInput(e.target.value)}
