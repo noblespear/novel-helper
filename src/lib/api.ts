@@ -14,6 +14,7 @@ import type {
   KbStatus,
   SearchHit,
   RebuildResult,
+  SkillMeta,
 } from "../types";
 
 export const api = {
@@ -68,6 +69,24 @@ export const api = {
     invoke<SearchHit[]>("search_semantic", { projectId, query, limit }),
   searchHybrid: (projectId: string, query: string, limit?: number) =>
     invoke<SearchHit[]>("search_hybrid", { projectId, query, limit }),
+
+  // Agent
+  listSkills: () => invoke<SkillMeta[]>("list_skills"),
+  runSkill: (
+    projectId: string,
+    skillName: string,
+    userInput: string,
+    onChunk: (chunk: ChatChunk) => void
+  ) => {
+    const channel = new Channel<ChatChunk>();
+    channel.onmessage = onChunk;
+    return invoke<void>("run_skill", {
+      projectId,
+      skillName,
+      userInput,
+      onChunk: channel,
+    });
+  },
   aiChatStream: (
     messages: ChatMessage[],
     onChunk: (chunk: ChatChunk) => void,

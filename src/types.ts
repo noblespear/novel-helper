@@ -110,6 +110,12 @@ export interface RebuildResult {
   last_rebuild_ts: number;
 }
 
+// Agent / Skill
+export interface SkillMeta {
+  name: string;
+  label: string;
+}
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;

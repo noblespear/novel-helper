@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 mod ai;
+mod agent;
 mod commands;
 mod kb;
 mod project;
@@ -141,6 +142,8 @@ pub fn run() {
             commands::search_fts,
             commands::search_semantic,
             commands::search_hybrid,
+            commands::list_skills,
+            commands::run_skill,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

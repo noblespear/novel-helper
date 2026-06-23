@@ -2,6 +2,10 @@
 
 use crate::ai::{ChatMessage, ChatRequest, ProviderConfig, ProviderRegistry};
 use crate::ai_state::{AISettings, AIState};
+use crate::agent::{
+    Agent, ListChaptersTool, ListCharactersTool, ReadChapterTool, ReadOutlineTool, RecallSkill,
+    SearchFtsTool, SkillContext,
+};
 use crate::kb::pipeline::{KbPaths, KbPipeline, SourceContent};
 use crate::kb::{KbMeta, KbStatus, ModelStatus, RebuildResult, SearchHit, DEFAULT_MODEL_REPO};
 use crate::project::{Project, ProjectSummary};
@@ -9,7 +13,7 @@ use crate::storage::Storage;
 use crate::AppConfig;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
@@ -489,3 +493,67 @@ fn collect_project_sources(
 // re-export for use in commands
 use crate::kb::fts::FtsIndex;
 use crate::kb::lancedb::VectorIndex;
+
+// ============================================================
+// Stage 2: Agent / Skill commands
+// ============================================================
+
+/// 列出所有可用的 skill
+#[tauri::command]
+pub fn list_skills() -> Vec<SkillMeta> {
+    crate::agent::SkillRegistry::list_builtin()
+        .into_iter()
+        .map(|(k, v)| SkillMeta {
+            name: k.to_string(),
+            label: v.to_string(),
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillMeta {
+    pub name: String,
+    pub label: String,
+}
+
+/// 运行一个 skill(流式输出)
+#[tauri::command]
+pub async fn run_skill(
+    config: State<'_, AppConfig>,
+    ai_state: State<'_, AIState>,
+    project_id: String,
+    skill_name: String,
+    user_input: String,
+    on_chunk: tauri::ipc::Channel<crate::ai::ChatChunk>,
+) -> Result<crate::agent::SkillOutput, String> {
+    // 构造 Agent: 加载 5 个核心 tools + 1 个 skill
+    let provider_cfg = ai_state.get_config();
+    let mut agent = Agent::new(provider_cfg);
+    agent.tools.register(Arc::new(SearchFtsTool));
+    agent.tools.register(Arc::new(ReadChapterTool));
+    agent.tools.register(Arc::new(ReadOutlineTool));
+    agent.tools.register(Arc::new(ListChaptersTool));
+    agent.tools.register(Arc::new(ListCharactersTool));
+
+    // 选 skill
+    let skill: Arc<dyn crate::agent::Skill> = match skill_name.as_str() {
+        "recall" => Arc::new(RecallSkill::new()),
+        _ => return Err(format!("skill not found: {}", skill_name)),
+    };
+    agent.skills.register(skill.clone());
+
+    // 把 projects_dir 注入 ctx(供 tool 解析 project_dir 用)
+    let mut ctx = SkillContext {
+        project_id: project_id.clone(),
+        skill_name: skill_name.clone(),
+        user_input,
+        context: std::collections::HashMap::new(),
+        on_chunk: None,
+    };
+    ctx.context.insert(
+        "projects_dir".to_string(),
+        serde_json::json!(config.projects_dir.to_string_lossy()),
+    );
+
+    agent.run(&skill_name, ctx, &on_chunk).await
+}

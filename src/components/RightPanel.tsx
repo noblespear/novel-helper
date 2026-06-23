@@ -1,15 +1,17 @@
-// 右栏(可切换:大纲/人物/AI/检索/知识库/AI设置)
+// 右栏(可切换:大纲/人物/AI/Agent/检索/知识库/AI设置)
 
 import { useAppStore } from "../stores/app";
 import { AIChatPanel } from "./AIChatPanel";
 import { AISettingsPanel } from "./AISettingsPanel";
 import { KnowledgeBase } from "./KnowledgeBase";
+import { AgentPanel } from "./AgentPanel";
 import { cn } from "../lib/utils";
 
 const tabs = [
   { id: "outline" as const, label: "大纲", icon: "📋" },
   { id: "character" as const, label: "人物", icon: "👤" },
   { id: "ai" as const, label: "AI", icon: "🤖" },
+  { id: "agent" as const, label: "Agent", icon: "🧠" },
   { id: "rag" as const, label: "检索", icon: "🔍" },
   { id: "kb" as const, label: "知识库", icon: "📚" },
 ];
@@ -51,6 +53,7 @@ export function RightPanel() {
         {rightPanel === "outline" && <OutlinePanel />}
         {rightPanel === "character" && <CharacterPanel />}
         {rightPanel === "ai" && <AIChatPanel />}
+        {rightPanel === "agent" && currentProjectId && <AgentPanel projectId={currentProjectId} />}
         {rightPanel === "rag" && <RAGPanel />}
         {rightPanel === "kb" && currentProjectId && <KnowledgeBase projectId={currentProjectId} />}
         {rightPanel === "ai-settings" && <AISettingsPanel />}
