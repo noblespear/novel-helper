@@ -13,8 +13,7 @@ interface NavItem {
 const items: NavItem[] = [
   { id: "home", label: "我的作品", icon: "📚", requiresProject: false },
   { id: "writing", label: "写作", icon: "✍", requiresProject: true },
-  { id: "outline", label: "大纲", icon: "📋", requiresProject: true },
-  { id: "character", label: "人物", icon: "👤", requiresProject: true },
+  // 人物/大纲/检索/知识库 都在右栏 tab 里(打开项目时显示),侧栏不再重复
   { id: "setting", label: "设定", icon: "🌍", requiresProject: true },
   { id: "material", label: "素材", icon: "💎", requiresProject: true },
   { id: "tool", label: "工具", icon: "🔧", requiresProject: false },

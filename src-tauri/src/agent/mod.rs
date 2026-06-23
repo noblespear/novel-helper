@@ -16,6 +16,7 @@ pub mod executor;
 pub mod registry;
 pub mod tools;
 pub mod skills;
+pub mod roleplay_skill;
 
 pub use skill::{Skill, SkillContext, SkillOutput, SkillChunk, BuiltinSkills, ToolCallRecord};
 pub use tool::{Tool, ToolContext, ToolResult, tool_to_openai_format};
@@ -25,3 +26,4 @@ pub use tools::{
     SearchFtsTool, ReadChapterTool, ListChaptersTool, ReadOutlineTool, ListCharactersTool,
 };
 pub use skills::RecallSkill;
+pub use roleplay_skill::{RoleplaySkill, build_roleplay_system_prompt};

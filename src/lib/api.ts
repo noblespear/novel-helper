@@ -15,6 +15,7 @@ import type {
   SearchHit,
   RebuildResult,
   SkillMeta,
+  Character,
 } from "../types";
 
 export const api = {
@@ -83,6 +84,28 @@ export const api = {
     return invoke<void>("run_skill", {
       projectId,
       skillName,
+      userInput,
+      onChunk: channel,
+    });
+  },
+
+  // 角色(Character)
+  listCharacters: (projectId: string) => invoke<Character[]>("list_characters", { projectId }),
+  upsertCharacter: (projectId: string, character: Character) =>
+    invoke<Character>("upsert_character", { projectId, character }),
+  deleteCharacter: (projectId: string, characterId: string) =>
+    invoke<void>("delete_character", { projectId, characterId }),
+  runRoleplay: (
+    projectId: string,
+    characterId: string,
+    userInput: string,
+    onChunk: (chunk: ChatChunk) => void
+  ) => {
+    const channel = new Channel<ChatChunk>();
+    channel.onmessage = onChunk;
+    return invoke<void>("run_roleplay", {
+      projectId,
+      characterId,
       userInput,
       onChunk: channel,
     });

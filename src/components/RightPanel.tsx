@@ -1,17 +1,17 @@
-// 右栏(可切换:大纲/人物/AI/Agent/检索/知识库/AI设置)
+// 右栏(可切换:大纲/人物/AI/检索/知识库/AI设置)
+// 人物 tab 是 agent 的家(角色扮演 + 知识召回 + 编辑)
 
 import { useAppStore } from "../stores/app";
 import { AIChatPanel } from "./AIChatPanel";
 import { AISettingsPanel } from "./AISettingsPanel";
 import { KnowledgeBase } from "./KnowledgeBase";
-import { AgentPanel } from "./AgentPanel";
+import { CharacterPanel as CharacterTab } from "./CharacterPanel";
 import { cn } from "../lib/utils";
 
 const tabs = [
   { id: "outline" as const, label: "大纲", icon: "📋" },
   { id: "character" as const, label: "人物", icon: "👤" },
   { id: "ai" as const, label: "AI", icon: "🤖" },
-  { id: "agent" as const, label: "Agent", icon: "🧠" },
   { id: "rag" as const, label: "检索", icon: "🔍" },
   { id: "kb" as const, label: "知识库", icon: "📚" },
 ];
@@ -51,9 +51,8 @@ export function RightPanel() {
 
       <div className="flex-1 overflow-auto text-sm">
         {rightPanel === "outline" && <OutlinePanel />}
-        {rightPanel === "character" && <CharacterPanel />}
+        {rightPanel === "character" && currentProjectId && <CharacterTab projectId={currentProjectId} />}
         {rightPanel === "ai" && <AIChatPanel />}
-        {rightPanel === "agent" && currentProjectId && <AgentPanel projectId={currentProjectId} />}
         {rightPanel === "rag" && <RAGPanel />}
         {rightPanel === "kb" && currentProjectId && <KnowledgeBase projectId={currentProjectId} />}
         {rightPanel === "ai-settings" && <AISettingsPanel />}
@@ -67,15 +66,6 @@ function OutlinePanel() {
     <div className="p-4">
       <p className="mb-2 text-default">📋 章节大纲</p>
       <p className="text-xs text-muted">P1 阶段:仅占位,P2 阶段实现细纲编辑</p>
-    </div>
-  );
-}
-
-function CharacterPanel() {
-  return (
-    <div className="p-4">
-      <p className="mb-2 text-default">👤 当前章节人物</p>
-      <p className="text-xs text-muted">P1 阶段:仅占位,P2 阶段实现角色卡</p>
     </div>
   );
 }

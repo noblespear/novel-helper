@@ -3,9 +3,10 @@
 use crate::ai::{ChatMessage, ChatRequest, ProviderConfig, ProviderRegistry};
 use crate::ai_state::{AISettings, AIState};
 use crate::agent::{
-    Agent, ListChaptersTool, ListCharactersTool, ReadChapterTool, ReadOutlineTool, RecallSkill,
-    SearchFtsTool, SkillContext,
+    build_roleplay_system_prompt, Agent, ListChaptersTool, ListCharactersTool,
+    ReadChapterTool, ReadOutlineTool, RecallSkill, RoleplaySkill, SearchFtsTool, SkillContext,
 };
+use crate::character::{load_characters, save_characters, Character};
 use crate::kb::pipeline::{KbPaths, KbPipeline, SourceContent};
 use crate::kb::{KbMeta, KbStatus, ModelStatus, RebuildResult, SearchHit, DEFAULT_MODEL_REPO};
 use crate::project::{Project, ProjectSummary};
@@ -13,6 +14,7 @@ use crate::storage::Storage;
 use crate::AppConfig;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, State};
 use uuid::Uuid;
@@ -556,4 +558,131 @@ pub async fn run_skill(
     );
 
     agent.run(&skill_name, ctx, &on_chunk).await
+}
+
+// ============================================================
+// Stage 3: 角色系统 commands
+// ============================================================
+
+fn character_project_dir(config: &AppConfig, project_id: &str) -> PathBuf {
+    config.projects_dir.join("projects").join(project_id)
+}
+
+/// 列出项目所有角色
+#[tauri::command]
+pub fn list_characters(
+    config: State<'_, AppConfig>,
+    project_id: String,
+) -> Result<Vec<Character>, String> {
+    load_characters(&character_project_dir(&config, &project_id))
+}
+
+/// 创建或更新角色
+#[tauri::command]
+pub fn upsert_character(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    character: Character,
+) -> Result<Character, String> {
+    let project_dir = character_project_dir(&config, &project_id);
+    let mut characters = load_characters(&project_dir).unwrap_or_default();
+
+    let now = Utc::now().timestamp();
+    let mut c = character;
+    c.project_id = project_id.clone();
+    c.updated_at = now;
+
+    // 找到已有则替换,否则追加
+    if let Some(existing) = characters.iter().position(|x| x.id == c.id) {
+        c.created_at = characters[existing].created_at;
+        characters[existing] = c.clone();
+    } else {
+        c.created_at = now;
+        characters.push(c.clone());
+    }
+
+    save_characters(&project_dir, &characters)?;
+    Ok(c)
+}
+
+/// 删除角色
+#[tauri::command]
+pub fn delete_character(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    character_id: String,
+) -> Result<(), String> {
+    let project_dir = character_project_dir(&config, &project_id);
+    let mut characters = load_characters(&project_dir)?;
+    let before = characters.len();
+    characters.retain(|c| c.id != character_id);
+    if characters.len() == before {
+        return Err(format!("character not found: {}", character_id));
+    }
+    save_characters(&project_dir, &characters)?;
+    Ok(())
+}
+
+/// 用指定角色与用户对话(角色扮演)
+#[tauri::command]
+pub async fn run_roleplay(
+    config: State<'_, AppConfig>,
+    ai_state: State<'_, AIState>,
+    project_id: String,
+    character_id: String,
+    user_input: String,
+    on_chunk: tauri::ipc::Channel<crate::ai::ChatChunk>,
+) -> Result<crate::agent::SkillOutput, String> {
+    // 1) 构造 system_prompt(从角色人设)
+    let system_prompt = build_roleplay_system_prompt(
+        &config.projects_dir.to_string_lossy(),
+        &project_id,
+        &character_id,
+    )?;
+
+    // 2) 用 ProviderRegistry 直接流式调(不走 Skill 框架,因为 system_prompt 动态生成)
+    let provider_cfg = ai_state.get_config();
+    let registry = ProviderRegistry::new(provider_cfg);
+    let messages = vec![
+        ChatMessage::system(system_prompt),
+        ChatMessage::user(user_input),
+    ];
+    let req = ChatRequest {
+        messages,
+        model: ai_state.get_config().model,
+        max_tokens: 2000,
+        temperature: 0.9,
+        stream: true,
+    };
+
+    // 把流式结果累积到 String(因为回调是 Fn 不是 FnMut,只能用 Arc<Mutex<>> 共享)
+    // 但 async 函数里 Arc<Mutex<>> 有生命周期问题,改用 polling 模式
+    // 这里我们走"内部 polling":把流直接转给 channel,在另一处累积
+    // 简化:让 run_roleplay 只转发流式 chunk,不返回累积 content(前端自己累积)
+    // 但 SkillOutput 要求 content 非空,所以还是得累积
+    //
+    // 用 std::sync::Mutex (Sync) + Arc 解决
+    use std::sync::Arc;
+    let result_holder: Arc<std::sync::Mutex<String>> = Arc::new(std::sync::Mutex::new(String::new()));
+    let rh2 = Arc::clone(&result_holder);
+    let cb = on_chunk.clone();
+    registry
+        .chat_stream(
+            req,
+            Box::new(move |chunk| {
+                if !chunk.content.is_empty() {
+                    rh2.lock().unwrap().push_str(&chunk.content);
+                }
+                let _ = cb.send(chunk);
+            }),
+        )
+        .await?;
+
+    let final_content = result_holder.lock().unwrap().clone();
+
+    Ok(crate::agent::SkillOutput {
+        content: final_content,
+        tool_calls: vec![],
+        tokens: 0,
+    })
 }

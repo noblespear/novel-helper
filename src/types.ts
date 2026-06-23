@@ -116,6 +116,28 @@ export interface SkillMeta {
   label: string;
 }
 
+// Character
+export interface Relationship {
+  target: string;
+  type: string;
+  description: string;
+}
+
+export interface Character {
+  id: string;
+  project_id: string;
+  name: string;
+  avatar: string | null;
+  personality: string;
+  speaking_style: string;
+  background: string;
+  relationships: Relationship[];
+  knowledge: string;
+  enabled_skills: string[];
+  created_at: number;
+  updated_at: number;
+}
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;

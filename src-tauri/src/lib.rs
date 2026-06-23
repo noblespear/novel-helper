@@ -4,6 +4,7 @@ use tauri::Manager;
 
 mod ai;
 mod agent;
+mod character;
 mod commands;
 mod kb;
 mod project;
@@ -144,6 +145,10 @@ pub fn run() {
             commands::search_hybrid,
             commands::list_skills,
             commands::run_skill,
+            commands::list_characters,
+            commands::upsert_character,
+            commands::delete_character,
+            commands::run_roleplay,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
