@@ -4,6 +4,7 @@ use tauri::Manager;
 
 mod ai;
 mod agent;
+mod ai_region;
 mod character;
 mod commands;
 mod kb;

@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { useAppStore } from "../stores/app";
 import { api } from "../lib/api";
 import { getEditorApi } from "../lib/editorBridge";
+import { wrapAiContent } from "../lib/aiRegion";
 import type { ChatMessage, PromptTemplates } from "../types";
 import type { SelectionAction } from "../components/SelectionToolbar";
 
@@ -34,10 +35,12 @@ function pickPrompt(
 }
 
 export interface SelectionActionResult {
-  /// 落到编辑器:replace 或 insert
+  /// 落到编辑器:replace 把 AI 输出(带 HTML 注释)插入到原选区,insert 续写在选区后
   apply: (mode: "replace" | "insert") => void;
-  /// 完整内容(给前端展示)
+  /// AI 输出文本(纯,不含注释)
   content: string;
+  /// AI 区域 id(可选)
+  regionId?: string;
 }
 
 export function useSelectionAction() {
@@ -100,15 +103,24 @@ export function useSelectionAction() {
         return { content: `[错误] ${e}`, apply: () => {} };
       }
 
-      // 返回结果 + 应用方法
+      // 包装为 AI 区域(带 HTML 注释,CodeMirror decoration 解析)
+      const { wrapped, id } = wrapAiContent(
+        acc,
+        text,
+        applyMode === "insert" ? "insert" : "replace"
+      );
+
       return {
         content: acc,
+        regionId: id,
         apply: (mode) => {
           if (!editorApi) return;
           if (mode === "replace") {
-            editorApi.replaceSelection(acc);
+            // 替换原选区为带注释的 AI 输出
+            editorApi.replaceSelection(wrapped);
           } else {
-            editorApi.insertAtCursor(acc);
+            // 续写:在当前光标处插入带注释的 AI 输出
+            editorApi.insertAtCursor(wrapped);
           }
         },
       };

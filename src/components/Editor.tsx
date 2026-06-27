@@ -12,6 +12,8 @@ import { countWords, formatNumber } from "../lib/utils";
 import { registerEditor, unregisterEditor, type EditorApi } from "../lib/editorBridge";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { useSelectionAction } from "../hooks/useSelectionAction";
+import { aiRegionExtension } from "../lib/aiRegionExtension";
+import { parseAiRegions, acceptRegion, rejectRegion } from "../lib/aiRegion";
 import type { FontFamily } from "../types";
 
 interface EditorProps {
@@ -123,6 +125,34 @@ export function Editor({ projectId }: EditorProps) {
         }
       },
       focus: () => cmRef.current?.view?.focus(),
+      acceptAiRegion: (regionId: string) => {
+        const view = cmRef.current?.view;
+        if (!view) return;
+        const text = view.state.doc.toString();
+        const regions = parseAiRegions(text);
+        const r = regions.find((x) => x.id === regionId && x.state === "pending");
+        if (!r) return;
+        const newText = acceptRegion(text, r);
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: newText },
+        });
+        setContent(newText);
+        view.focus();
+      },
+      rejectAiRegion: (regionId: string) => {
+        const view = cmRef.current?.view;
+        if (!view) return;
+        const text = view.state.doc.toString();
+        const regions = parseAiRegions(text);
+        const r = regions.find((x) => x.id === regionId && x.state === "pending");
+        if (!r) return;
+        const newText = rejectRegion(text, r);
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: newText },
+        });
+        setContent(newText);
+        view.focus();
+      },
     };
     registerEditor(api);
     return () => unregisterEditor();
@@ -201,6 +231,7 @@ export function Editor({ projectId }: EditorProps) {
             extensions={[
               markdown({ base: markdownLanguage, codeLanguages: languages }),
               EditorView.lineWrapping,
+              aiRegionExtension(),
               EditorView.theme({
                 "&": { fontSize: "15px" },
                 ".cm-content": {

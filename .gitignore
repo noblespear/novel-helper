@@ -58,3 +58,6 @@ coverage/
 # OS
 desktop.ini
 $RECYCLE.BIN/
+
+# Screenshots (dev only)
+screenshot*.png

@@ -14,6 +14,10 @@ export interface EditorApi {
   getFullText(): string;
   setFullText(text: string): void;
   focus(): void;
+  /// 接受 AI 区域 — 去掉注释,保留内容
+  acceptAiRegion(regionId: string): void;
+  /// 拒绝 AI 区域 — 整段删除
+  rejectAiRegion(regionId: string): void;
 }
 
 let api: EditorApi | null = null;
