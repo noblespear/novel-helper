@@ -686,3 +686,86 @@ pub async fn run_roleplay(
         tokens: 0,
     })
 }
+
+// ============================================================
+// Phase 2: 大纲系统 commands
+// ============================================================
+
+use crate::outline::{OutlineLevel, OutlineNode, OutlineStorage, OutlineNodeTree};
+
+fn outline_project_dir(config: &AppConfig, project_id: &str) -> PathBuf {
+    config.projects_dir.join("projects").join(project_id)
+}
+
+/// 加载大纲（树形结构）
+#[tauri::command]
+pub fn load_outline(
+    config: State<'_, AppConfig>,
+    project_id: String,
+) -> Result<Vec<OutlineNodeTree>, String> {
+    let project_dir = outline_project_dir(&config, &project_id);
+    let nodes = OutlineStorage::load(&project_dir).map_err(|e| e.to_string())?;
+    Ok(OutlineStorage::to_tree(&nodes))
+}
+
+/// 加载大纲（扁平列表）
+#[tauri::command]
+pub fn load_outline_flat(
+    config: State<'_, AppConfig>,
+    project_id: String,
+) -> Result<Vec<OutlineNode>, String> {
+    let project_dir = outline_project_dir(&config, &project_id);
+    OutlineStorage::load(&project_dir).map_err(|e| e.to_string())
+}
+
+/// 添加大纲节点
+#[tauri::command]
+pub fn add_outline_node(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    level: String,
+    parent_id: Option<String>,
+    title: String,
+) -> Result<OutlineNode, String> {
+    let project_dir = outline_project_dir(&config, &project_id);
+    let level = match level.as_str() {
+        "macro" => OutlineLevel::Macro,
+        "volume" => OutlineLevel::Volume,
+        "chapter" => OutlineLevel::Chapter,
+        _ => return Err(format!("无效的级别: {}", level)),
+    };
+    OutlineStorage::add_node(&project_dir, level, parent_id, &title).map_err(|e| e.to_string())
+}
+
+/// 更新大纲节点
+#[tauri::command]
+pub fn update_outline_node(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    node: OutlineNode,
+) -> Result<(), String> {
+    let project_dir = outline_project_dir(&config, &project_id);
+    OutlineStorage::update_node(&project_dir, &node).map_err(|e| e.to_string())
+}
+
+/// 删除大纲节点
+#[tauri::command]
+pub fn delete_outline_node(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    node_id: String,
+) -> Result<(), String> {
+    let project_dir = outline_project_dir(&config, &project_id);
+    OutlineStorage::delete_node(&project_dir, &node_id).map_err(|e| e.to_string())
+}
+
+/// 重新排序大纲节点
+#[tauri::command]
+pub fn reorder_outline_nodes(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    ordered_ids: Vec<String>,
+) -> Result<(), String> {
+    let project_dir = outline_project_dir(&config, &project_id);
+    OutlineStorage::reorder_nodes(&project_dir, &ordered_ids).map_err(|e| e.to_string())
+}

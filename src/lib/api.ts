@@ -16,6 +16,9 @@ import type {
   RebuildResult,
   SkillMeta,
   Character,
+  OutlineLevel,
+  OutlineNode,
+  OutlineNodeTree,
 } from "../types";
 
 export const api = {
@@ -110,6 +113,30 @@ export const api = {
       onChunk: channel,
     });
   },
+
+  // 大纲(Outline)
+  loadOutline: (projectId: string) =>
+    invoke<OutlineNodeTree[]>("load_outline", { projectId }),
+  loadOutlineFlat: (projectId: string) =>
+    invoke<OutlineNode[]>("load_outline_flat", { projectId }),
+  addOutlineNode: (
+    projectId: string,
+    level: OutlineLevel,
+    parentId: string | null,
+    title: string
+  ) =>
+    invoke<OutlineNode>("add_outline_node", {
+      projectId,
+      level,
+      parentId,
+      title,
+    }),
+  updateOutlineNode: (projectId: string, node: OutlineNode) =>
+    invoke<void>("update_outline_node", { projectId, node }),
+  deleteOutlineNode: (projectId: string, nodeId: string) =>
+    invoke<void>("delete_outline_node", { projectId, nodeId }),
+  reorderOutlineNodes: (projectId: string, orderedIds: string[]) =>
+    invoke<void>("reorder_outline_nodes", { projectId, orderedIds }),
   aiChatStream: (
     messages: ChatMessage[],
     onChunk: (chunk: ChatChunk) => void,

@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { api } from "../lib/api";
-import type { Chapter, FontFamily, ProjectSummary, ProviderConfig, Theme } from "../types";
+import type { Chapter, FontFamily, ProjectSummary, ProviderConfig, Theme, OutlineNodeTree, OutlineNode } from "../types";
 
 interface AppState {
   // 主题与外观
@@ -29,6 +29,15 @@ interface AppState {
   aiConfig: ProviderConfig | null;
   setAIConfig: (c: ProviderConfig) => void;
   loadAISettings: () => Promise<void>;
+
+  // 大纲
+  outline: OutlineNodeTree[];
+  outlineFlat: OutlineNode[];
+  loadOutline: (projectId: string) => Promise<void>;
+  addOutlineNode: (projectId: string, level: string, parentId: string | null, title: string) => Promise<OutlineNode | null>;
+  updateOutlineNode: (projectId: string, node: OutlineNode) => Promise<void>;
+  deleteOutlineNode: (projectId: string, nodeId: string) => Promise<void>;
+  reorderOutlineNodes: (projectId: string, orderedIds: string[]) => Promise<void>;
 
   // UI
   rightPanel: "outline" | "character" | "ai" | "rag" | "kb" | "ai-settings";
@@ -94,6 +103,75 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ aiConfig: s.config });
     } catch (e) {
       console.error("Failed to load AI settings:", e);
+    }
+  },
+
+  // 大纲
+  outline: [],
+  outlineFlat: [],
+  loadOutline: async (projectId: string) => {
+    try {
+      const [tree, flat] = await Promise.all([
+        api.loadOutline(projectId),
+        api.loadOutlineFlat(projectId),
+      ]);
+      set({ outline: tree, outlineFlat: flat });
+    } catch (e) {
+      console.error("Failed to load outline:", e);
+    }
+  },
+  addOutlineNode: async (projectId, level, parentId, title) => {
+    try {
+      const node = await api.addOutlineNode(projectId, level as any, parentId, title);
+      // 重新加载大纲
+      const [tree, flat] = await Promise.all([
+        api.loadOutline(projectId),
+        api.loadOutlineFlat(projectId),
+      ]);
+      set({ outline: tree, outlineFlat: flat });
+      return node;
+    } catch (e) {
+      console.error("Failed to add outline node:", e);
+      return null;
+    }
+  },
+  updateOutlineNode: async (projectId, node) => {
+    try {
+      await api.updateOutlineNode(projectId, node);
+      // 重新加载大纲
+      const [tree, flat] = await Promise.all([
+        api.loadOutline(projectId),
+        api.loadOutlineFlat(projectId),
+      ]);
+      set({ outline: tree, outlineFlat: flat });
+    } catch (e) {
+      console.error("Failed to update outline node:", e);
+    }
+  },
+  deleteOutlineNode: async (projectId, nodeId) => {
+    try {
+      await api.deleteOutlineNode(projectId, nodeId);
+      // 重新加载大纲
+      const [tree, flat] = await Promise.all([
+        api.loadOutline(projectId),
+        api.loadOutlineFlat(projectId),
+      ]);
+      set({ outline: tree, outlineFlat: flat });
+    } catch (e) {
+      console.error("Failed to delete outline node:", e);
+    }
+  },
+  reorderOutlineNodes: async (projectId, orderedIds) => {
+    try {
+      await api.reorderOutlineNodes(projectId, orderedIds);
+      // 重新加载大纲
+      const [tree, flat] = await Promise.all([
+        api.loadOutline(projectId),
+        api.loadOutlineFlat(projectId),
+      ]);
+      set({ outline: tree, outlineFlat: flat });
+    } catch (e) {
+      console.error("Failed to reorder outline nodes:", e);
     }
   },
 

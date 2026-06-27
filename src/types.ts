@@ -138,6 +138,24 @@ export interface Character {
   updated_at: number;
 }
 
+// 大纲系统
+export type OutlineLevel = "macro" | "volume" | "chapter";
+
+export interface OutlineNode {
+  id: string;
+  level: OutlineLevel;
+  parent_id: string | null;
+  title: string;
+  content: string;
+  order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OutlineNodeTree extends Omit<OutlineNode, "children"> {
+  children: OutlineNodeTree[];
+}
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
