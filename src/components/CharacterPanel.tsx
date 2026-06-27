@@ -141,20 +141,22 @@ export function CharacterPanel({ projectId }: CharacterPanelProps) {
 
       {/* 右侧:详情 */}
       <div className="flex-1 flex flex-col min-w-0">
-        {selected ? (
+        {(selected || (editing && editing.id === selectedId)) ? (
           <>
             <div
               className="px-3 py-2 border-b flex items-center gap-2"
               style={{ borderColor: "var(--color-border)" }}
             >
-              <span className="text-lg">{selected.avatar || "👤"}</span>
-              <span className="font-medium flex-1 truncate">{selected.name}</span>
-              <button
-                onClick={del}
-                className="text-xs text-red-400 hover:text-red-300"
-              >
-                删除
-              </button>
+              <span className="text-lg">{(selected || editing)?.avatar || "👤"}</span>
+              <span className="font-medium flex-1 truncate">{(selected || editing)?.name}</span>
+              {selected && (
+                <button
+                  onClick={del}
+                  className="text-xs text-red-400 hover:text-red-300"
+                >
+                  删除
+                </button>
+              )}
             </div>
             <div
               className="flex border-b"
@@ -186,13 +188,13 @@ export function CharacterPanel({ projectId }: CharacterPanelProps) {
                   onSave={save}
                 />
               )}
-              {mode === "roleplay" && (
+              {mode === "roleplay" && selected && (
                 <RoleplayChat
                   projectId={projectId}
                   character={selected}
                 />
               )}
-              {mode === "recall" && (
+              {mode === "recall" && selected && (
                 <RecallPanel projectId={projectId} characterName={selected.name} />
               )}
             </div>
