@@ -152,64 +152,55 @@ function OutlinePanel() {
     let userPrompt = "";
 
     if (selectedNode.level === "macro") {
-      systemPrompt = `你是一个专业的中文网文大纲助手。你的任务是根据用户提供的总纲，生成合理的分卷和章节结构。
+      systemPrompt = `你是一个专业的中文网文大纲助手。你的任务是根据用户提供的总纲，生成合理的分卷结构。
 
 输出要求：
 1. 严格按照 JSON 格式输出，不要包含任何其他文字
 2. 每卷需要有标题和内容描述
-3. 每章需要有标题和情节要点
-4. 卷的数量根据故事规模合理规划（一般 3-8 卷）
-5. 每卷包含 10-30 个章节
+3. 卷的数量根据故事规模合理规划（一般 3-5 卷）
+4. 每卷包含 3-5 个章节作为示例
+
+重要：JSON 必须完整，不要被截断。
 
 输出 JSON 格式：
 {
   "volumes": [
     {
-      "title": "卷标题（如：第一卷 重生归来）",
-      "content": "本卷故事概要，包含主要事件和转折",
+      "title": "卷标题",
+      "content": "本卷故事概要",
       "chapters": [
-        {
-          "title": "章节标题（如：第一章 重来一次）",
-          "content": "章节情节要点，2-3句话概括"
-        }
+        { "title": "章标题", "content": "章节情节要点" }
       ]
     }
   ]
 }`;
 
-      userPrompt = `请根据以下总纲，生成分卷和章节结构：
+      userPrompt = `请根据以下总纲，生成分卷结构（3-5卷，每卷3-5章）：
 
 总纲标题：${selectedNode.title}
-总纲内容：
-${selectedNode.content || "（请根据标题推断故事内容）"}
-
-请直接返回 JSON，不要包含 markdown 代码块标记。`;
+总纲内容：${selectedNode.content || "（请根据标题推断故事内容）"}`;
     } else if (selectedNode.level === "volume") {
       systemPrompt = `你是一个专业的中文网文大纲助手。你的任务是根据用户提供的卷信息，生成详细的章节大纲。
 
 输出要求：
 1. 严格按照 JSON 格式输出，不要包含任何其他文字
 2. 每章需要有标题和情节要点
-3. 章节数量根据卷的规模合理规划（一般 10-30 章）
-4. 章节之间要有连贯性和节奏感
+3. 章节数量控制在 3-5 章
+4. 章节之间要有连贯性
+
+重要：JSON 必须完整，不要被截断。
 
 输出 JSON 格式：
 {
   "chapters": [
-    {
-      "title": "章节标题（如：第一章 重来一次）",
-      "content": "章节情节要点，2-3句话概括本章主要事件"
-    }
+    { "title": "章标题", "content": "章节情节要点" }
   ]
 }`;
 
-      userPrompt = `请根据以下卷信息，生成章节大纲：
+      userPrompt = `请根据以下卷信息，生成章节大纲（3-5章）：
 
 卷标题：${selectedNode.title}
-卷内容：
-${selectedNode.content || "（请根据标题推断内容）"}
-
-请直接返回 JSON，不要包含 markdown 代码块标记。`;
+卷内容：${selectedNode.content || "（请根据标题推断内容）"}`;
     }
 
     try {
@@ -225,40 +216,79 @@ ${selectedNode.content || "（请根据标题推断内容）"}
         }
       });
 
-      // 解析 JSON 响应
-      // 尝试提取 JSON（可能包含在 markdown 代码块中）
+      console.log("AI response:", acc);
+
+      // 解析 JSON 响应 - 更健壮的解析
       let jsonStr = acc;
+
+      // 1. 尝试提取 markdown 代码块中的 JSON
       const jsonMatch = acc.match(/```(?:json)?\s*([\s\S]*?)```/);
       if (jsonMatch) {
         jsonStr = jsonMatch[1];
       }
 
-      const result = JSON.parse(jsonStr.trim());
+      // 2. 清理字符串
+      jsonStr = jsonStr.trim();
+
+      // 3. 尝试修复常见的 JSON 问题
+      // 如果以 { 开头但没有匹配的 }，尝试补全
+      if (jsonStr.startsWith("{") && !jsonStr.endsWith("}")) {
+        // 找到最后一个完整的对象
+        const lastCompleteObj = jsonStr.lastIndexOf("}");
+        if (lastCompleteObj > 0) {
+          jsonStr = jsonStr.substring(0, lastCompleteObj + 1);
+          // 补全数组和对象
+          const openBrackets = (jsonStr.match(/\[/g) || []).length;
+          const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+          const openBraces = (jsonStr.match(/{/g) || []).length;
+          const closeBraces = (jsonStr.match(/}/g) || []).length;
+
+          for (let i = 0; i < openBrackets - closeBrackets; i++) jsonStr += "]";
+          for (let i = 0; i < openBraces - closeBraces; i++) jsonStr += "}";
+        }
+      }
+
+      console.log("Parsed JSON:", jsonStr);
+
+      const result = JSON.parse(jsonStr);
 
       // 根据级别添加节点
+      let addedCount = 0;
       if (selectedNode.level === "macro" && result.volumes) {
         for (const vol of result.volumes) {
           const volNode = await addOutlineNode(currentProjectId, "volume", selectedNode.id, vol.title);
-          if (volNode && vol.chapters) {
-            for (const ch of vol.chapters) {
-              await addOutlineNode(currentProjectId, "chapter", volNode.id, ch.title);
-              // TODO: 更新章节的 content 字段
+          if (volNode) {
+            // 更新卷的 content
+            if (vol.content) {
+              await updateOutlineNode(currentProjectId, { ...volNode, content: vol.content });
+            }
+            if (vol.chapters) {
+              for (const ch of vol.chapters) {
+                const chNode = await addOutlineNode(currentProjectId, "chapter", volNode.id, ch.title);
+                if (chNode && ch.content) {
+                  await updateOutlineNode(currentProjectId, { ...chNode, content: ch.content });
+                }
+                addedCount++;
+              }
             }
           }
         }
       } else if (selectedNode.level === "volume" && result.chapters) {
         for (const ch of result.chapters) {
-          await addOutlineNode(currentProjectId, "chapter", selectedNode.id, ch.title);
-          // TODO: 更新章节的 content 字段
+          const chNode = await addOutlineNode(currentProjectId, "chapter", selectedNode.id, ch.title);
+          if (chNode && ch.content) {
+            await updateOutlineNode(currentProjectId, { ...chNode, content: ch.content });
+          }
+          addedCount++;
         }
       }
 
       // 重新加载大纲
       await loadOutline(currentProjectId);
-      alert("AI 大纲生成完成！");
+      alert(`AI 大纲生成完成！共添加 ${addedCount} 个节点。`);
     } catch (e) {
       console.error("AI generation failed:", e);
-      alert("AI 生成失败：" + e);
+      alert("AI 生成失败：" + e + "\n\n请确保已配置 AI Provider。");
     } finally {
       setAiGenerating(false);
     }
