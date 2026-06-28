@@ -69,16 +69,27 @@ export function RightPanel() {
 function OutlinePanel() {
   const { currentProjectId, outline, loadOutline, addOutlineNode, updateOutlineNode, deleteOutlineNode } = useAppStore();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-  const [showAddMenu, setShowAddMenu] = useState(false);
-  const [addMenuParentId, setAddMenuParentId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
 
   useEffect(() => {
     if (currentProjectId) {
       loadOutline(currentProjectId);
     }
   }, [currentProjectId, loadOutline]);
+
+  // 找到选中的节点
+  const findNode = (nodes: OutlineNodeTree[], id: string): OutlineNodeTree | null => {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      const found = findNode(n.children, id);
+      if (found) return found;
+    }
+    return null;
+  };
+  const selectedNode = selectedId ? findNode(outline, selectedId) : null;
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -89,100 +100,162 @@ function OutlinePanel() {
     });
   };
 
-  const startEdit = (node: OutlineNodeTree) => {
-    setEditingId(node.id);
+  const selectNode = (node: OutlineNodeTree) => {
+    // 先保存之前的编辑
+    saveCurrentEdit();
+    setSelectedId(node.id);
     setEditingTitle(node.title);
+    setEditingContent(node.content);
+    // 自动展开
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.add(node.id);
+      return next;
+    });
   };
 
-  const finishEdit = async (node: OutlineNodeTree) => {
-    if (!currentProjectId || !editingTitle.trim()) {
-      setEditingId(null);
-      return;
-    }
+  const saveCurrentEdit = async () => {
+    if (!currentProjectId || !selectedId || !selectedNode) return;
+    if (editingTitle === selectedNode.title && editingContent === selectedNode.content) return;
     await updateOutlineNode(currentProjectId, {
-      ...node,
-      title: editingTitle.trim(),
+      ...selectedNode,
+      title: editingTitle,
+      content: editingContent,
     });
-    setEditingId(null);
+  };
+
+  const handleAdd = async (level: string, parentId: string | null = null) => {
+    if (!currentProjectId) return;
+    const title = level === "macro" ? "总纲" : level === "volume" ? "新卷" : "新章节";
+    const node = await addOutlineNode(currentProjectId, level, parentId, title);
+    if (node) {
+      selectNode({ ...node, children: [] });
+    }
   };
 
   const handleDelete = async (nodeId: string) => {
     if (!currentProjectId) return;
-    if (confirm("确认删除此节点及其所有子节点?")) {
-      await deleteOutlineNode(currentProjectId, nodeId);
+    if (!confirm("确认删除此节点及其所有子节点?")) return;
+    if (selectedId === nodeId) {
+      setSelectedId(null);
+    }
+    await deleteOutlineNode(currentProjectId, nodeId);
+  };
+
+  const handleAIGenerate = async () => {
+    if (!currentProjectId || !selectedNode) return;
+    setAiGenerating(true);
+    try {
+      // 构建提示词
+      let prompt = "";
+      if (selectedNode.level === "macro") {
+        prompt = `根据以下总纲内容，帮我拆解成具体的卷和章节结构。每个卷需要有标题和简要描述，每个章需要有标题和情节要点。
+
+总纲标题：${selectedNode.title}
+总纲内容：
+${selectedNode.content || "（无内容）"}
+
+请返回 JSON 格式：
+{
+  "volumes": [
+    {
+      "title": "卷标题",
+      "content": "卷的描述",
+      "chapters": [
+        { "title": "章标题", "content": "章节情节要点" }
+      ]
+    }
+  ]
+}`;
+      } else if (selectedNode.level === "volume") {
+        prompt = `根据以下卷的内容，帮我拆解成具体的章节。每个章需要有标题和情节要点。
+
+卷标题：${selectedNode.title}
+卷内容：
+${selectedNode.content || "（无内容）"}
+
+请返回 JSON 格式：
+{
+  "chapters": [
+    { "title": "章标题", "content": "章节情节要点" }
+  ]
+}`;
+      }
+
+      // TODO: 调用 AI API 生成大纲
+      // 暂时用 mock 数据演示
+      alert("AI 大纲生成功能即将上线！\n\n提示词预览：\n" + prompt.slice(0, 200) + "...");
+    } finally {
+      setAiGenerating(false);
     }
   };
 
-  const handleAdd = async (level: string) => {
-    if (!currentProjectId) return;
-    const title = level === "macro" ? "总纲" : level === "volume" ? "新卷" : "新章节";
-    await addOutlineNode(currentProjectId, level, addMenuParentId, title);
-    setShowAddMenu(false);
-    setAddMenuParentId(null);
-  };
-
-  const openAddMenu = (parentId: string | null = null) => {
-    setAddMenuParentId(parentId);
-    setShowAddMenu(true);
+  // 根据父节点级别决定可以添加的子节点类型
+  const getAddableLevels = (parentLevel: string | null): string[] => {
+    if (!parentLevel) return ["macro"];
+    if (parentLevel === "macro") return ["volume"];
+    if (parentLevel === "volume") return ["chapter"];
+    return []; // chapter 下不能再添加子节点
   };
 
   const renderNode = (node: OutlineNodeTree, depth: number = 0) => {
     const isExpanded = expandedIds.has(node.id);
-    const isEditing = editingId === node.id;
+    const isSelected = selectedId === node.id;
     const hasChildren = node.children.length > 0;
     const levelIcon = node.level === "macro" ? "📖" : node.level === "volume" ? "📚" : "📄";
+    const addable = getAddableLevels(node.level);
 
     return (
       <div key={node.id}>
         <div
-          className="flex items-center gap-1 py-1 px-2 hover:bg-[var(--color-elevated)] rounded group"
+          className={`flex items-center gap-1 py-1 px-2 rounded group cursor-pointer ${isSelected ? "bg-[var(--color-elevated)] border border-[var(--color-accent)]" : "hover:bg-[var(--color-elevated)] border border-transparent"}`}
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
+          onClick={() => selectNode(node)}
         >
           {/* 展开/折叠按钮 */}
           <button
-            className="w-4 h-4 flex items-center justify-center text-muted"
-            onClick={() => toggleExpand(node.id)}
+            className="w-4 h-4 flex items-center justify-center text-muted shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleExpand(node.id);
+            }}
           >
             {hasChildren ? (isExpanded ? "▼" : "▶") : <span className="w-4" />}
           </button>
 
           {/* 级别图标 */}
-          <span className="text-xs">{levelIcon}</span>
+          <span className="text-xs shrink-0">{levelIcon}</span>
 
           {/* 标题 */}
-          {isEditing ? (
-            <input
-              className="flex-1 bg-[var(--color-elevated)] border border-[var(--color-border)] rounded px-1 text-sm outline-none"
-              value={editingTitle}
-              onChange={(e) => setEditingTitle(e.target.value)}
-              onBlur={() => finishEdit(node)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") finishEdit(node);
-                if (e.key === "Escape") setEditingId(null);
-              }}
-              autoFocus
-            />
-          ) : (
-            <span
-              className="flex-1 text-sm cursor-pointer truncate"
-              onDoubleClick={() => startEdit(node)}
-            >
-              {node.title}
+          <span className="flex-1 text-sm truncate">{node.title}</span>
+
+          {/* 内容预览 */}
+          {node.content && (
+            <span className="text-xs text-muted truncate max-w-[80px]">
+              {node.content.slice(0, 20)}...
             </span>
           )}
 
           {/* 操作按钮 */}
-          <div className="hidden group-hover:flex items-center gap-1">
-            <button
-              className="text-xs text-muted hover:text-[var(--color-accent)]"
-              onClick={() => openAddMenu(node.id)}
-              title="添加子节点"
-            >
-              +
-            </button>
+          <div className="hidden group-hover:flex items-center gap-1 shrink-0">
+            {addable.length > 0 && (
+              <button
+                className="text-xs text-muted hover:text-[var(--color-accent)]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAdd(addable[0], node.id);
+                }}
+                title={`添加${addable[0] === "volume" ? "卷" : "章"}`}
+              >
+                +
+              </button>
+            )}
             <button
               className="text-xs text-muted hover:text-red-500"
-              onClick={() => handleDelete(node.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(node.id);
+              }}
               title="删除"
             >
               ×
@@ -202,57 +275,79 @@ function OutlinePanel() {
       {/* 头部 */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--color-border)]">
         <span className="text-xs font-medium text-default">📋 大纲</span>
-        <button
-          className="text-xs text-muted hover:text-[var(--color-accent)]"
-          onClick={() => openAddMenu(null)}
-        >
-          + 添加
-        </button>
+        <div className="flex items-center gap-2">
+          {selectedNode && selectedNode.level !== "chapter" && (
+            <button
+              className="text-xs px-2 py-0.5 rounded bg-[var(--color-accent)] text-white disabled:opacity-50"
+              onClick={handleAIGenerate}
+              disabled={aiGenerating}
+            >
+              {aiGenerating ? "..." : "🤖 AI 拆解"}
+            </button>
+          )}
+          <button
+            className="text-xs text-muted hover:text-[var(--color-accent)]"
+            onClick={() => handleAdd("macro")}
+          >
+            + 添加
+          </button>
+        </div>
       </div>
 
-      {/* 添加菜单 */}
-      {showAddMenu && (
-        <div className="px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-elevated)]">
-          <p className="text-xs text-muted mb-1">选择级别:</p>
-          <div className="flex gap-2">
-            <button
-              className="px-2 py-1 text-xs rounded bg-[var(--color-bg)] hover:bg-[var(--color-accent)] hover:text-white"
-              onClick={() => handleAdd("macro")}
-            >
-              📖 总纲
-            </button>
-            <button
-              className="px-2 py-1 text-xs rounded bg-[var(--color-bg)] hover:bg-[var(--color-accent)] hover:text-white"
-              onClick={() => handleAdd("volume")}
-            >
-              📚 卷
-            </button>
-            <button
-              className="px-2 py-1 text-xs rounded bg-[var(--color-bg)] hover:bg-[var(--color-accent)] hover:text-white"
-              onClick={() => handleAdd("chapter")}
-            >
-              📄 章
-            </button>
-            <button
-              className="px-2 py-1 text-xs rounded text-muted"
-              onClick={() => setShowAddMenu(false)}
-            >
-              取消
-            </button>
+      {/* 内容区：左侧树 + 右侧编辑 */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* 左侧：大纲树 */}
+        <div className="w-48 border-r overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>
+          <div className="p-2">
+            {outline.length === 0 ? (
+              <div className="text-center text-muted text-xs py-8">
+                <p className="mb-2">暂无大纲</p>
+                <p>点击"+ 添加"开始创建</p>
+              </div>
+            ) : (
+              outline.map((node) => renderNode(node))
+            )}
           </div>
         </div>
-      )}
 
-      {/* 大纲树 */}
-      <div className="flex-1 overflow-auto p-2">
-        {outline.length === 0 ? (
-          <div className="text-center text-muted text-xs py-8">
-            <p className="mb-2">暂无大纲</p>
-            <p>点击右上角"+ 添加"开始创建</p>
-          </div>
-        ) : (
-          outline.map((node) => renderNode(node))
-        )}
+        {/* 右侧：编辑区 */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {selectedNode ? (
+            <>
+              {/* 标题编辑 */}
+              <div className="px-3 py-2 border-b" style={{ borderColor: "var(--color-border)" }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-muted">
+                    {selectedNode.level === "macro" ? "📖 总纲" : selectedNode.level === "volume" ? "📚 卷" : "📄 章"}
+                  </span>
+                </div>
+                <input
+                  className="input text-sm w-full"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  onBlur={saveCurrentEdit}
+                  placeholder="标题"
+                />
+              </div>
+
+              {/* 内容编辑 */}
+              <div className="flex-1 overflow-hidden">
+                <textarea
+                  className="w-full h-full p-3 text-sm bg-transparent border-none outline-none resize-none font-writing"
+                  value={editingContent}
+                  onChange={(e) => setEditingContent(e.target.value)}
+                  onBlur={saveCurrentEdit}
+                  placeholder={selectedNode.level === "chapter" ? "在此输入章节正文..." : "在此输入大纲内容..."}
+                  style={{ lineHeight: "1.8" }}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-muted text-xs">
+              选择左侧节点编辑内容
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
