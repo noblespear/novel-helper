@@ -22,7 +22,11 @@ export function SelectionToolbar({ onAction, scrollContainerRef }: SelectionTool
 
   // 监听 mousedown:mousedown 时隐藏 toolbar(避免挡住下一次选区)
   useEffect(() => {
-    const handler = () => {
+    const handler = (e: MouseEvent) => {
+      // 如果点击的是 toolbar 内部，不隐藏
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-selection-toolbar]')) return;
+
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
       hideTimerRef.current = window.setTimeout(() => {
         setInfo(null);
