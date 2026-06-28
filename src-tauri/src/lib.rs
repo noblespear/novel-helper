@@ -8,6 +8,7 @@ mod ai_region;
 mod character;
 mod commands;
 mod kb;
+mod lore;
 mod outline;
 mod project;
 mod storage;
@@ -157,6 +158,11 @@ pub fn run() {
             commands::update_outline_node,
             commands::delete_outline_node,
             commands::reorder_outline_nodes,
+            commands::load_lore,
+            commands::add_lore_entry,
+            commands::update_lore_entry,
+            commands::delete_lore_entry,
+            commands::search_lore,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

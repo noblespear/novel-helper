@@ -156,6 +156,21 @@ export interface OutlineNodeTree extends Omit<OutlineNode, "children"> {
   children: OutlineNodeTree[];
 }
 
+// 设定集系统
+export type LoreCategory = "world" | "faction" | "location" | "item" | "power" | "custom";
+
+export interface LoreEntry {
+  id: string;
+  category: LoreCategory;
+  name: string;
+  description: string;
+  details: string;
+  tags: string[];
+  related_characters: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;

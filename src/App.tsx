@@ -16,7 +16,7 @@ type View = "home" | "writing" | "outline" | "character" | "setting" | "material
 
 export default function App() {
   const [view, setView] = useState<View>("home");
-  const { theme, font, immersive, currentProjectId, setCurrentProject, refreshChapters, chapters, currentChapterId, toggleImmersive, commandPaletteOpen, setCommandPaletteOpen, loadAISettings, loadOutline } = useAppStore();
+  const { theme, font, immersive, currentProjectId, setCurrentProject, refreshChapters, chapters, currentChapterId, toggleImmersive, commandPaletteOpen, setCommandPaletteOpen, loadAISettings, loadOutline, loadLore } = useAppStore();
 
   // 加载 AI 设置
   useEffect(() => {
@@ -64,6 +64,7 @@ export default function App() {
       setCurrentProject(id);
       await refreshChapters(id); // 关键:进入项目后立刻拉取章节
       await loadOutline(id); // 加载大纲
+      await loadLore(id); // 加载设定集
       setView("writing");
     } catch (e) {
       console.error("Open project failed:", e);

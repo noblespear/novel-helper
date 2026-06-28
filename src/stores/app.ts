@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { api } from "../lib/api";
-import type { Chapter, FontFamily, ProjectSummary, ProviderConfig, Theme, OutlineNodeTree, OutlineNode } from "../types";
+import type { Chapter, FontFamily, ProjectSummary, ProviderConfig, Theme, OutlineNodeTree, OutlineNode, LoreEntry } from "../types";
 
 interface AppState {
   // 主题与外观
@@ -39,10 +39,17 @@ interface AppState {
   deleteOutlineNode: (projectId: string, nodeId: string) => Promise<void>;
   reorderOutlineNodes: (projectId: string, orderedIds: string[]) => Promise<void>;
 
+  // 设定集
+  lore: LoreEntry[];
+  loadLore: (projectId: string) => Promise<void>;
+  addLoreEntry: (projectId: string, category: string, name: string) => Promise<LoreEntry | null>;
+  updateLoreEntry: (projectId: string, entry: LoreEntry) => Promise<void>;
+  deleteLoreEntry: (projectId: string, entryId: string) => Promise<void>;
+
   // UI
-  rightPanel: "outline" | "character" | "ai" | "rag" | "kb" | "ai-settings";
+  rightPanel: "outline" | "character" | "lore" | "ai" | "rag" | "kb" | "ai-settings";
   setRightPanel: (
-    p: "outline" | "character" | "ai" | "rag" | "kb" | "ai-settings"
+    p: "outline" | "character" | "lore" | "ai" | "rag" | "kb" | "ai-settings"
   ) => void;
   leftPanelVisible: boolean;
   toggleLeftPanel: () => void;
@@ -172,6 +179,46 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ outline: tree, outlineFlat: flat });
     } catch (e) {
       console.error("Failed to reorder outline nodes:", e);
+    }
+  },
+
+  // 设定集
+  lore: [],
+  loadLore: async (projectId: string) => {
+    try {
+      const entries = await api.loadLore(projectId);
+      set({ lore: entries });
+    } catch (e) {
+      console.error("Failed to load lore:", e);
+    }
+  },
+  addLoreEntry: async (projectId, category, name) => {
+    try {
+      const entry = await api.addLoreEntry(projectId, category as any, name);
+      const entries = await api.loadLore(projectId);
+      set({ lore: entries });
+      return entry;
+    } catch (e) {
+      console.error("Failed to add lore entry:", e);
+      return null;
+    }
+  },
+  updateLoreEntry: async (projectId, entry) => {
+    try {
+      await api.updateLoreEntry(projectId, entry);
+      const entries = await api.loadLore(projectId);
+      set({ lore: entries });
+    } catch (e) {
+      console.error("Failed to update lore entry:", e);
+    }
+  },
+  deleteLoreEntry: async (projectId, entryId) => {
+    try {
+      await api.deleteLoreEntry(projectId, entryId);
+      const entries = await api.loadLore(projectId);
+      set({ lore: entries });
+    } catch (e) {
+      console.error("Failed to delete lore entry:", e);
     }
   },
 

@@ -7,12 +7,14 @@ import { AIChatPanel } from "./AIChatPanel";
 import { AISettingsPanel } from "./AISettingsPanel";
 import { KnowledgeBase } from "./KnowledgeBase";
 import { CharacterPanel as CharacterTab } from "./CharacterPanel";
+import { LorePanel as LoreTab } from "./LorePanel";
 import { cn } from "../lib/utils";
 import type { OutlineNodeTree } from "../types";
 
 const tabs = [
   { id: "outline" as const, label: "大纲", icon: "📋" },
   { id: "character" as const, label: "人物", icon: "👤" },
+  { id: "lore" as const, label: "设定", icon: "🌍" },
   { id: "ai" as const, label: "AI", icon: "🤖" },
   { id: "rag" as const, label: "检索", icon: "🔍" },
   { id: "kb" as const, label: "知识库", icon: "📚" },
@@ -54,6 +56,7 @@ export function RightPanel() {
       <div className="flex-1 overflow-auto text-sm">
         {rightPanel === "outline" && <OutlinePanel />}
         {rightPanel === "character" && currentProjectId && <CharacterTab projectId={currentProjectId} />}
+        {rightPanel === "lore" && currentProjectId && <LoreTab projectId={currentProjectId} />}
         {rightPanel === "ai" && <AIChatPanel />}
         {rightPanel === "rag" && <RAGPanel />}
         {rightPanel === "kb" && currentProjectId && <KnowledgeBase projectId={currentProjectId} />}

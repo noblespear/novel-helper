@@ -769,3 +769,79 @@ pub fn reorder_outline_nodes(
     let project_dir = outline_project_dir(&config, &project_id);
     OutlineStorage::reorder_nodes(&project_dir, &ordered_ids).map_err(|e| e.to_string())
 }
+
+// ============================================================
+// Phase 2: 设定集系统 commands
+// ============================================================
+
+use crate::lore::{LoreCategory, LoreEntry, LoreStorage};
+
+fn lore_project_dir(config: &AppConfig, project_id: &str) -> PathBuf {
+    config.projects_dir.join("projects").join(project_id)
+}
+
+/// 加载设定集
+#[tauri::command]
+pub fn load_lore(
+    config: State<'_, AppConfig>,
+    project_id: String,
+) -> Result<Vec<LoreEntry>, String> {
+    let project_dir = lore_project_dir(&config, &project_id);
+    LoreStorage::load(&project_dir).map_err(|e| e.to_string())
+}
+
+/// 添加设定条目
+#[tauri::command]
+pub fn add_lore_entry(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    category: String,
+    name: String,
+) -> Result<LoreEntry, String> {
+    let project_dir = lore_project_dir(&config, &project_id);
+    let category = match category.as_str() {
+        "world" => LoreCategory::World,
+        "faction" => LoreCategory::Faction,
+        "location" => LoreCategory::Location,
+        "item" => LoreCategory::Item,
+        "power" => LoreCategory::Power,
+        "custom" => LoreCategory::Custom,
+        _ => return Err(format!("无效的类别: {}", category)),
+    };
+    LoreStorage::add_entry(&project_dir, category, &name).map_err(|e| e.to_string())
+}
+
+/// 更新设定条目
+#[tauri::command]
+pub fn update_lore_entry(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    entry: LoreEntry,
+) -> Result<(), String> {
+    let project_dir = lore_project_dir(&config, &project_id);
+    LoreStorage::update_entry(&project_dir, &entry).map_err(|e| e.to_string())
+}
+
+/// 删除设定条目
+#[tauri::command]
+pub fn delete_lore_entry(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    entry_id: String,
+) -> Result<(), String> {
+    let project_dir = lore_project_dir(&config, &project_id);
+    LoreStorage::delete_entry(&project_dir, &entry_id).map_err(|e| e.to_string())
+}
+
+/// 搜索设定
+#[tauri::command]
+pub fn search_lore(
+    config: State<'_, AppConfig>,
+    project_id: String,
+    query: String,
+) -> Result<Vec<LoreEntry>, String> {
+    let project_dir = lore_project_dir(&config, &project_id);
+    let entries = LoreStorage::load(&project_dir).map_err(|e| e.to_string())?;
+    let results = LoreStorage::search(&entries, &query);
+    Ok(results.into_iter().cloned().collect())
+}

@@ -19,6 +19,8 @@ import type {
   OutlineLevel,
   OutlineNode,
   OutlineNodeTree,
+  LoreCategory,
+  LoreEntry,
 } from "../types";
 
 export const api = {
@@ -137,6 +139,17 @@ export const api = {
     invoke<void>("delete_outline_node", { projectId, nodeId }),
   reorderOutlineNodes: (projectId: string, orderedIds: string[]) =>
     invoke<void>("reorder_outline_nodes", { projectId, orderedIds }),
+
+  // 设定集(Lore)
+  loadLore: (projectId: string) => invoke<LoreEntry[]>("load_lore", { projectId }),
+  addLoreEntry: (projectId: string, category: LoreCategory, name: string) =>
+    invoke<LoreEntry>("add_lore_entry", { projectId, category, name }),
+  updateLoreEntry: (projectId: string, entry: LoreEntry) =>
+    invoke<void>("update_lore_entry", { projectId, entry }),
+  deleteLoreEntry: (projectId: string, entryId: string) =>
+    invoke<void>("delete_lore_entry", { projectId, entryId }),
+  searchLore: (projectId: string, query: string) =>
+    invoke<LoreEntry[]>("search_lore", { projectId, query }),
   aiChatStream: (
     messages: ChatMessage[],
     onChunk: (chunk: ChatChunk) => void,
