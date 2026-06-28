@@ -3,13 +3,14 @@
 
 import { useState, useEffect } from "react";
 import { useAppStore } from "../stores/app";
+import { api } from "../lib/api";
 import { AIChatPanel } from "./AIChatPanel";
 import { AISettingsPanel } from "./AISettingsPanel";
 import { KnowledgeBase } from "./KnowledgeBase";
 import { CharacterPanel as CharacterTab } from "./CharacterPanel";
 import { LorePanel as LoreTab } from "./LorePanel";
 import { cn } from "../lib/utils";
-import type { OutlineNodeTree } from "../types";
+import type { OutlineNodeTree, ChatMessage } from "../types";
 
 const tabs = [
   { id: "outline" as const, label: "大纲", icon: "📋" },
@@ -145,46 +146,119 @@ function OutlinePanel() {
   const handleAIGenerate = async () => {
     if (!currentProjectId || !selectedNode) return;
     setAiGenerating(true);
-    try {
-      // 构建提示词
-      let prompt = "";
-      if (selectedNode.level === "macro") {
-        prompt = `根据以下总纲内容，帮我拆解成具体的卷和章节结构。每个卷需要有标题和简要描述，每个章需要有标题和情节要点。
 
-总纲标题：${selectedNode.title}
-总纲内容：
-${selectedNode.content || "（无内容）"}
+    // 构建提示词
+    let systemPrompt = "";
+    let userPrompt = "";
 
-请返回 JSON 格式：
+    if (selectedNode.level === "macro") {
+      systemPrompt = `你是一个专业的中文网文大纲助手。你的任务是根据用户提供的总纲，生成合理的分卷和章节结构。
+
+输出要求：
+1. 严格按照 JSON 格式输出，不要包含任何其他文字
+2. 每卷需要有标题和内容描述
+3. 每章需要有标题和情节要点
+4. 卷的数量根据故事规模合理规划（一般 3-8 卷）
+5. 每卷包含 10-30 个章节
+
+输出 JSON 格式：
 {
   "volumes": [
     {
-      "title": "卷标题",
-      "content": "卷的描述",
+      "title": "卷标题（如：第一卷 重生归来）",
+      "content": "本卷故事概要，包含主要事件和转折",
       "chapters": [
-        { "title": "章标题", "content": "章节情节要点" }
+        {
+          "title": "章节标题（如：第一章 重来一次）",
+          "content": "章节情节要点，2-3句话概括"
+        }
       ]
     }
   ]
 }`;
-      } else if (selectedNode.level === "volume") {
-        prompt = `根据以下卷的内容，帮我拆解成具体的章节。每个章需要有标题和情节要点。
+
+      userPrompt = `请根据以下总纲，生成分卷和章节结构：
+
+总纲标题：${selectedNode.title}
+总纲内容：
+${selectedNode.content || "（请根据标题推断故事内容）"}
+
+请直接返回 JSON，不要包含 markdown 代码块标记。`;
+    } else if (selectedNode.level === "volume") {
+      systemPrompt = `你是一个专业的中文网文大纲助手。你的任务是根据用户提供的卷信息，生成详细的章节大纲。
+
+输出要求：
+1. 严格按照 JSON 格式输出，不要包含任何其他文字
+2. 每章需要有标题和情节要点
+3. 章节数量根据卷的规模合理规划（一般 10-30 章）
+4. 章节之间要有连贯性和节奏感
+
+输出 JSON 格式：
+{
+  "chapters": [
+    {
+      "title": "章节标题（如：第一章 重来一次）",
+      "content": "章节情节要点，2-3句话概括本章主要事件"
+    }
+  ]
+}`;
+
+      userPrompt = `请根据以下卷信息，生成章节大纲：
 
 卷标题：${selectedNode.title}
 卷内容：
-${selectedNode.content || "（无内容）"}
+${selectedNode.content || "（请根据标题推断内容）"}
 
-请返回 JSON 格式：
-{
-  "chapters": [
-    { "title": "章标题", "content": "章节情节要点" }
-  ]
-}`;
+请直接返回 JSON，不要包含 markdown 代码块标记。`;
+    }
+
+    try {
+      const messages: ChatMessage[] = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ];
+
+      let acc = "";
+      await api.aiChatStream(messages, (chunk) => {
+        if (!chunk.done && chunk.content) {
+          acc += chunk.content;
+        }
+      });
+
+      // 解析 JSON 响应
+      // 尝试提取 JSON（可能包含在 markdown 代码块中）
+      let jsonStr = acc;
+      const jsonMatch = acc.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1];
       }
 
-      // TODO: 调用 AI API 生成大纲
-      // 暂时用 mock 数据演示
-      alert("AI 大纲生成功能即将上线！\n\n提示词预览：\n" + prompt.slice(0, 200) + "...");
+      const result = JSON.parse(jsonStr.trim());
+
+      // 根据级别添加节点
+      if (selectedNode.level === "macro" && result.volumes) {
+        for (const vol of result.volumes) {
+          const volNode = await addOutlineNode(currentProjectId, "volume", selectedNode.id, vol.title);
+          if (volNode && vol.chapters) {
+            for (const ch of vol.chapters) {
+              await addOutlineNode(currentProjectId, "chapter", volNode.id, ch.title);
+              // TODO: 更新章节的 content 字段
+            }
+          }
+        }
+      } else if (selectedNode.level === "volume" && result.chapters) {
+        for (const ch of result.chapters) {
+          await addOutlineNode(currentProjectId, "chapter", selectedNode.id, ch.title);
+          // TODO: 更新章节的 content 字段
+        }
+      }
+
+      // 重新加载大纲
+      await loadOutline(currentProjectId);
+      alert("AI 大纲生成完成！");
+    } catch (e) {
+      console.error("AI generation failed:", e);
+      alert("AI 生成失败：" + e);
     } finally {
       setAiGenerating(false);
     }
