@@ -5,7 +5,7 @@ import { useAppStore } from "../stores/app";
 import { api } from "../lib/api";
 import { getEditorApi } from "../lib/editorBridge";
 import { wrapAiContent } from "../lib/aiRegion";
-import type { ChatMessage, PromptTemplates } from "../types";
+import type { ChatMessage, PromptTemplates, Character, LoreEntry } from "../types";
 import type { SelectionAction } from "../components/SelectionToolbar";
 
 const DEFAULT_PROMPTS: PromptTemplates = {
@@ -14,7 +14,7 @@ const DEFAULT_PROMPTS: PromptTemplates = {
   polish_chapter:
     "你是一个中文网文润色助手。保持作者文风,只改不通顺、错别字、明显病句。直接返回润色后的全文,不要解释。",
   continue_write:
-    "你是中文网文续写助手。基于用户给的正文续写约 200 字,保持文风一致,情节连贯。只返回续写内容,不要解释。",
+    "你是中文网文续写助手。基于上下文信息续写约 200-300 字,保持文风一致,情节连贯。只返回续写内容,不要解释。",
   character_design: "你是网文编辑,擅长角色设计。",
   general_chat:
     "你是一个中文网文写作助手,帮作者构思、答疑、激发灵感。回答简洁有针对性,优先给可执行的具体建议。",
@@ -24,6 +24,68 @@ const DEFAULT_PROMPTS: PromptTemplates = {
 
 function renderTemplate(tpl: string, text: string, chapterTitle: string): string {
   return tpl.replace(/\{text\}/g, text).replace(/\{chapter_title\}/g, chapterTitle);
+}
+
+/**
+ * 构建续写上下文：包含最近章节摘要、角色信息、设定信息
+ */
+async function buildContinueContext(
+  projectId: string,
+  currentChapterId: string,
+  chapters: Array<{ id: string; title: string; outline: string; word_count: number }>,
+  recentCount: number = 3
+): Promise<string> {
+  const contextParts: string[] = [];
+
+  // 1. 获取最近几章的摘要（滑动窗口）
+  const currentIdx = chapters.findIndex((c) => c.id === currentChapterId);
+  if (currentIdx >= 0) {
+    const recentChapters = chapters.slice(Math.max(0, currentIdx - recentCount), currentIdx);
+    if (recentChapters.length > 0) {
+      const summaries = recentChapters
+        .filter((c) => c.outline || c.word_count > 0)
+        .map((c) => `【${c.title}】${c.outline || "(无大纲)"}`)
+        .join("\n");
+      if (summaries) {
+        contextParts.push(`## 前文概要\n${summaries}`);
+      }
+    }
+  }
+
+  // 2. 获取角色信息
+  try {
+    const characters = await api.listCharacters(projectId);
+    if (characters.length > 0) {
+      const charInfo = characters
+        .slice(0, 10) // 限制数量避免 token 超限
+        .map((c: Character) => {
+          const parts = [`姓名：${c.name}`];
+          if (c.personality) parts.push(`性格：${c.personality}`);
+          if (c.speaking_style) parts.push(`说话风格：${c.speaking_style}`);
+          return parts.join("，");
+        })
+        .join("\n");
+      contextParts.push(`## 角色信息\n${charInfo}`);
+    }
+  } catch {
+    // 忽略角色加载失败
+  }
+
+  // 3. 获取设定信息（只取前5条重要的）
+  try {
+    const lore = await api.loadLore(projectId);
+    if (lore.length > 0) {
+      const loreInfo = lore
+        .slice(0, 5)
+        .map((l: LoreEntry) => `【${l.name}】${l.description || l.details.slice(0, 100)}`)
+        .join("\n");
+      contextParts.push(`## 世界观设定\n${loreInfo}`);
+    }
+  } catch {
+    // 忽略设定加载失败
+  }
+
+  return contextParts.join("\n\n");
 }
 
 function pickPrompt(
@@ -44,7 +106,7 @@ export interface SelectionActionResult {
 }
 
 export function useSelectionAction() {
-  const { aiConfig, currentChapterId, chapters } = useAppStore();
+  const { aiConfig, currentProjectId, currentChapterId, chapters } = useAppStore();
 
   const handleAction = useCallback(
     async (action: SelectionAction, text: string): Promise<SelectionActionResult | null> => {
@@ -79,11 +141,28 @@ export function useSelectionAction() {
         return null;
       }
 
-      const systemPrompt = renderTemplate(
+      // 构建系统提示
+      let systemPrompt = renderTemplate(
         pickPrompt(templates, promptKey),
         text,
         chapterTitle
       );
+
+      // 续写时注入上下文
+      if (action === "continue" && currentProjectId && currentChapterId) {
+        try {
+          const context = await buildContinueContext(
+            currentProjectId,
+            currentChapterId,
+            chapters
+          );
+          if (context) {
+            systemPrompt = `${systemPrompt}\n\n## 上下文信息\n${context}`;
+          }
+        } catch (e) {
+          console.error("Failed to build context:", e);
+        }
+      }
 
       // 流式拉取 AI 响应
       const messages: ChatMessage[] = [
@@ -125,7 +204,7 @@ export function useSelectionAction() {
         },
       };
     },
-    [aiConfig, currentChapterId, chapters]
+    [aiConfig, currentProjectId, currentChapterId, chapters]
   );
 
   return { handleAction };
