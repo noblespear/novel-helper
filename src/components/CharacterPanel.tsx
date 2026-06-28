@@ -94,57 +94,56 @@ export function CharacterPanel({ projectId }: CharacterPanelProps) {
   };
 
   return (
-    <div className="flex h-full text-sm">
-      {/* 左侧:角色列表 */}
+    <div className="flex flex-col h-full text-sm">
+      {/* 顶部:角色列表（横向滚动） */}
       <div
-        className="w-44 border-r overflow-y-auto p-2"
+        className="border-b p-2"
         style={{ borderColor: "var(--color-border)" }}
       >
-        <button
-          className="btn btn-primary w-full text-xs mb-2"
-          onClick={createNew}
-        >
-          + 新角色
-        </button>
-        {characters.length === 0 ? (
-          <div className="text-xs text-muted text-center mt-4">
-            还没有角色
-            <br />
-            点击新建
-          </div>
-        ) : (
-          <div className="space-y-1">
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            className="btn btn-primary text-xs px-2 py-1"
+            onClick={createNew}
+          >
+            + 新角色
+          </button>
+          {characters.length === 0 && (
+            <span className="text-xs text-muted">还没有角色，点击新建</span>
+          )}
+        </div>
+        {characters.length > 0 && (
+          <div className="flex gap-1 overflow-x-auto pb-1">
             {characters.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setSelectedId(c.id)}
-                className="w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2"
+                className="shrink-0 px-2 py-1 rounded text-xs flex items-center gap-1"
                 style={{
                   background:
                     c.id === selectedId
                       ? "var(--color-elevated)"
-                      : "transparent",
+                      : "var(--color-bg)",
                   color: "var(--color-text)",
                   border:
                     c.id === selectedId
                       ? "1px solid var(--color-accent)"
-                      : "1px solid transparent",
+                      : "1px solid var(--color-border)",
                 }}
               >
-                <span className="text-base">{c.avatar || "👤"}</span>
-                <span className="truncate flex-1">{c.name}</span>
+                <span>{c.avatar || "👤"}</span>
+                <span className="truncate max-w-[80px]">{c.name}</span>
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* 右侧:详情 */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* 下方:详情 */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {(selected || (editing && editing.id === selectedId)) ? (
           <>
             <div
-              className="px-3 py-2 border-b flex items-center gap-2"
+              className="px-3 py-2 border-b flex items-center gap-2 shrink-0"
               style={{ borderColor: "var(--color-border)" }}
             >
               <span className="text-lg">{(selected || editing)?.avatar || "👤"}</span>
@@ -159,7 +158,7 @@ export function CharacterPanel({ projectId }: CharacterPanelProps) {
               )}
             </div>
             <div
-              className="flex border-b"
+              className="flex border-b shrink-0"
               style={{ borderColor: "var(--color-border)" }}
             >
               {(["edit", "roleplay", "recall"] as Mode[]).map((m) => (
