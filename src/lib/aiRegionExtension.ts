@@ -38,6 +38,17 @@ function buildDecos(text: string): DecorationSet {
   for (let i = 0; i < regions.length; i++) {
     const r = regions[i];
     const cls = stateToClass(r.state);
+
+    // 隐藏起始注释 <!-- @ai:id:xxx ... -->
+    builder.add(
+      r.start,
+      r.aiStart,
+      Decoration.mark({
+        attributes: { class: "cm-ai-hidden", style: "display:none" },
+        inclusive: false,
+      })
+    );
+
     // AI 内容区装饰(浅色背景 + 虚线)
     builder.add(
       r.aiStart,
@@ -48,6 +59,17 @@ function buildDecos(text: string): DecorationSet {
         inclusive: false,
       })
     );
+
+    // 隐藏结束注释 <!-- /ai:id:xxx -->
+    builder.add(
+      r.aiEnd,
+      r.end,
+      Decoration.mark({
+        attributes: { class: "cm-ai-hidden", style: "display:none" },
+        inclusive: false,
+      })
+    );
+
     // 在 AI 区域末尾加一个 widget 小图标
     builder.add(
       r.aiEnd,
