@@ -170,17 +170,28 @@ export function useSelectionAction() {
         { role: "user", content: userMsg },
       ];
 
+      console.log("[AI] Starting request, model:", aiConfig?.model);
+      console.log("[AI] Messages:", messages.length, "system prompt length:", systemPrompt.length);
+
       let acc = "";
       const editorApi = getEditorApi();
       try {
         await api.aiChatStream(messages, (chunk) => {
-          if (chunk.done) return;
+          if (chunk.done) {
+            console.log("[AI] Stream done, total length:", acc.length);
+            return;
+          }
           acc += chunk.content;
+          if (acc.length % 100 === 0) {
+            console.log("[AI] Progress:", acc.length, "chars");
+          }
         });
       } catch (e) {
-        console.error("AI action failed:", e);
+        console.error("[AI] Action failed:", e);
         return { content: `[错误] ${e}`, apply: () => {} };
       }
+
+      console.log("[AI] Completed, response length:", acc.length);
 
       // 包装为 AI 区域(带 HTML 注释,CodeMirror decoration 解析)
       const { wrapped, id } = wrapAiContent(

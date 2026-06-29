@@ -157,10 +157,15 @@ export const api = {
   ) => {
     const channel = new Channel<ChatChunk>();
     channel.onmessage = onChunk;
-    return invoke<void>("ai_chat_stream", {
+    // 添加超时机制，防止无限挂起
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("AI 请求超时（60秒）")), 60000);
+    });
+    const aiCall = invoke<void>("ai_chat_stream", {
       onChunk: channel,
       messages,
       model: model ?? null,
     });
+    return Promise.race([aiCall, timeout]);
   },
 };
