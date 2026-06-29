@@ -110,6 +110,8 @@ export function useSelectionAction() {
 
   const handleAction = useCallback(
     async (action: SelectionAction, text: string): Promise<SelectionActionResult | null> => {
+      console.log("[AI-DEBUG] handleAction called, action:", action, "text length:", text.length);
+
       if (action === "copy") {
         await navigator.clipboard.writeText(text);
         return { content: text, apply: () => {} };
@@ -119,12 +121,15 @@ export function useSelectionAction() {
       let templates: PromptTemplates | null = null;
       try {
         templates = await api.getPromptTemplates();
-      } catch {
+        console.log("[AI-DEBUG] Templates loaded:", !!templates);
+      } catch (e) {
+        console.log("[AI-DEBUG] Failed to load templates:", e);
         templates = null;
       }
 
       const chapter = chapters.find((c) => c.id === currentChapterId);
       const chapterTitle = chapter?.title ?? "";
+      console.log("[AI-DEBUG] Chapter:", chapterTitle, "projectId:", currentProjectId);
 
       let promptKey: keyof PromptTemplates;
       let userMsg = text;
@@ -138,6 +143,7 @@ export function useSelectionAction() {
       } else if (action === "rewrite") {
         promptKey = "rewrite";
       } else {
+        console.log("[AI-DEBUG] Unknown action:", action);
         return null;
       }
 
@@ -147,10 +153,12 @@ export function useSelectionAction() {
         text,
         chapterTitle
       );
+      console.log("[AI-DEBUG] System prompt length:", systemPrompt.length);
 
       // 续写时注入上下文
       if (action === "continue" && currentProjectId && currentChapterId) {
         try {
+          console.log("[AI-DEBUG] Building context...");
           const context = await buildContinueContext(
             currentProjectId,
             currentChapterId,
@@ -158,9 +166,10 @@ export function useSelectionAction() {
           );
           if (context) {
             systemPrompt = `${systemPrompt}\n\n## 上下文信息\n${context}`;
+            console.log("[AI-DEBUG] Context added, total prompt length:", systemPrompt.length);
           }
         } catch (e) {
-          console.error("Failed to build context:", e);
+          console.error("[AI-DEBUG] Failed to build context:", e);
         }
       }
 
@@ -170,11 +179,14 @@ export function useSelectionAction() {
         { role: "user", content: userMsg },
       ];
 
-      console.log("[AI] Starting request, model:", aiConfig?.model);
+      console.log("[AI-DEBUG] Starting AI call, model:", aiConfig?.model);
+      console.log("[AI-DEBUG] Provider type:", aiConfig?.provider_type);
+      console.log("[AI-DEBUG] Base URL:", aiConfig?.base_url);
 
       let acc = "";
       let lastChunkTime = Date.now();
       let timedOut = false;
+      let chunkCount = 0;
       const TIMEOUT_MS = 30000; // 30秒无数据视为超时
 
       // 超时检测定时器
@@ -182,37 +194,45 @@ export function useSelectionAction() {
         if (Date.now() - lastChunkTime > TIMEOUT_MS) {
           timedOut = true;
           clearInterval(timeoutCheck);
-          console.error("[AI] Timeout: no data for 30s");
+          console.error("[AI-DEBUG] Timeout: no data for 30s, received:", acc.length, "chars");
         }
       }, 1000);
 
       const editorApi = getEditorApi();
       try {
+        console.log("[AI-DEBUG] Calling api.aiChatStream...");
         await api.aiChatStream(messages, (chunk) => {
           lastChunkTime = Date.now();
+          chunkCount++;
           if (chunk.done) {
             clearInterval(timeoutCheck);
-            console.log("[AI] Stream done, total length:", acc.length);
+            console.log("[AI-DEBUG] Stream DONE, total chunks:", chunkCount, "total length:", acc.length);
             return;
           }
           acc += chunk.content;
+          if (chunkCount % 5 === 0) {
+            console.log("[AI-DEBUG] Chunk", chunkCount, "received, total:", acc.length);
+          }
         });
         clearInterval(timeoutCheck);
+        console.log("[AI-DEBUG] aiChatStream returned, acc length:", acc.length);
       } catch (e) {
         clearInterval(timeoutCheck);
-        console.error("[AI] Action failed:", e);
+        console.error("[AI-DEBUG] AI call FAILED:", e);
         return { content: `[错误] ${e}`, apply: () => {} };
       }
 
       if (timedOut) {
+        console.error("[AI-DEBUG] Returning timeout error");
         return { content: "[错误] AI 响应超时，请检查网络和 API 设置", apply: () => {} };
       }
 
       if (!acc) {
+        console.error("[AI-DEBUG] Returning empty response error");
         return { content: "[错误] AI 返回了空内容", apply: () => {} };
       }
 
-      console.log("[AI] Completed, response length:", acc.length);
+      console.log("[AI-DEBUG] SUCCESS, response length:", acc.length);
 
       // 包装为 AI 区域(带 HTML 注释,CodeMirror decoration 解析)
       const { wrapped, id } = wrapAiContent(

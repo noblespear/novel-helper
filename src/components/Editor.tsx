@@ -255,12 +255,15 @@ export function Editor({ projectId }: EditorProps) {
         <SelectionToolbar
           scrollContainerRef={scrollerRef}
           onAction={async (action, text) => {
+            console.log("[EDITOR] onAction called:", action, "text:", text.substring(0, 50));
             if (action === "copy") {
               const r = await handleAction(action, text);
               if (r) setToast("已复制到剪贴板");
             } else {
               setToast(`AI 正在${action === "polish" ? "润色" : action === "continue" ? "续写" : "改写"}…`);
+              console.log("[EDITOR] Calling handleAction...");
               const r = await handleAction(action, text);
+              console.log("[EDITOR] handleAction returned:", r ? "result" : "null");
               if (r) {
                 r.apply(action === "continue" ? "insert" : "replace");
                 setToast("✓ 已应用");
