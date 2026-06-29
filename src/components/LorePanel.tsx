@@ -103,7 +103,7 @@ export function LorePanel({ projectId }: LorePanelProps) {
       {/* 内容区：上方列表 + 下方编辑 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 上方：条目列表 */}
-        <div className="border-b overflow-y-auto" style={{ borderColor: "var(--color-border)", maxHeight: "35%" }}>
+        <div className="border-b overflow-y-auto shrink-0" style={{ borderColor: "var(--color-border)", minHeight: "80px", maxHeight: "180px" }}>
           <div className="p-2">
             <button
               className="btn btn-primary w-full text-xs mb-2"

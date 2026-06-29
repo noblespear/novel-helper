@@ -401,7 +401,7 @@ function OutlinePanel() {
       {/* 内容区：上方树 + 下方编辑 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 上方：大纲树 */}
-        <div className="border-b overflow-y-auto" style={{ borderColor: "var(--color-border)", maxHeight: "40%" }}>
+        <div className="border-b overflow-y-auto shrink-0" style={{ borderColor: "var(--color-border)", minHeight: "100px", maxHeight: "200px" }}>
           <div className="p-2">
             {outline.length === 0 ? (
               <div className="text-center text-muted text-xs py-4">
@@ -415,7 +415,7 @@ function OutlinePanel() {
         </div>
 
         {/* 下方：编辑区 */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           {selectedNode ? (
             <>
               {/* 标题编辑 */}
@@ -435,7 +435,7 @@ function OutlinePanel() {
               </div>
 
               {/* 内容编辑 */}
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden min-h-0">
                 <textarea
                   className="w-full h-full p-3 text-sm bg-transparent border-none outline-none resize-none font-writing"
                   value={editingContent}
