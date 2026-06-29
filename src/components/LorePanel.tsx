@@ -100,10 +100,10 @@ export function LorePanel({ projectId }: LorePanelProps) {
         </div>
       </div>
 
-      {/* 内容区：列表 + 编辑 */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* 左侧：条目列表 */}
-        <div className="w-36 border-r overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>
+      {/* 内容区：上方列表 + 下方编辑 */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* 上方：条目列表 */}
+        <div className="border-b overflow-y-auto" style={{ borderColor: "var(--color-border)", maxHeight: "35%" }}>
           <div className="p-2">
             <button
               className="btn btn-primary w-full text-xs mb-2"
@@ -137,7 +137,7 @@ export function LorePanel({ projectId }: LorePanelProps) {
           )}
         </div>
 
-        {/* 右侧：编辑区 */}
+        {/* 下方：编辑区 */}
         <div className="flex-1 overflow-y-auto">
           {editing ? (
             <div className="p-3 space-y-3">

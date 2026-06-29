@@ -398,14 +398,14 @@ function OutlinePanel() {
         </div>
       </div>
 
-      {/* 内容区：左侧树 + 右侧编辑 */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* 左侧：大纲树 */}
-        <div className="w-48 border-r overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>
+      {/* 内容区：上方树 + 下方编辑 */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* 上方：大纲树 */}
+        <div className="border-b overflow-y-auto" style={{ borderColor: "var(--color-border)", maxHeight: "40%" }}>
           <div className="p-2">
             {outline.length === 0 ? (
-              <div className="text-center text-muted text-xs py-8">
-                <p className="mb-2">暂无大纲</p>
+              <div className="text-center text-muted text-xs py-4">
+                <p className="mb-1">暂无大纲</p>
                 <p>点击"+ 添加"开始创建</p>
               </div>
             ) : (
@@ -414,12 +414,12 @@ function OutlinePanel() {
           </div>
         </div>
 
-        {/* 右侧：编辑区 */}
+        {/* 下方：编辑区 */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedNode ? (
             <>
               {/* 标题编辑 */}
-              <div className="px-3 py-2 border-b" style={{ borderColor: "var(--color-border)" }}>
+              <div className="px-3 py-2 border-b shrink-0" style={{ borderColor: "var(--color-border)" }}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs text-muted">
                     {selectedNode.level === "macro" ? "📖 总纲" : selectedNode.level === "volume" ? "📚 卷" : "📄 章"}

@@ -171,24 +171,45 @@ export function useSelectionAction() {
       ];
 
       console.log("[AI] Starting request, model:", aiConfig?.model);
-      console.log("[AI] Messages:", messages.length, "system prompt length:", systemPrompt.length);
 
       let acc = "";
+      let lastChunkTime = Date.now();
+      let timedOut = false;
+      const TIMEOUT_MS = 30000; // 30秒无数据视为超时
+
+      // 超时检测定时器
+      const timeoutCheck = setInterval(() => {
+        if (Date.now() - lastChunkTime > TIMEOUT_MS) {
+          timedOut = true;
+          clearInterval(timeoutCheck);
+          console.error("[AI] Timeout: no data for 30s");
+        }
+      }, 1000);
+
       const editorApi = getEditorApi();
       try {
         await api.aiChatStream(messages, (chunk) => {
+          lastChunkTime = Date.now();
           if (chunk.done) {
+            clearInterval(timeoutCheck);
             console.log("[AI] Stream done, total length:", acc.length);
             return;
           }
           acc += chunk.content;
-          if (acc.length % 100 === 0) {
-            console.log("[AI] Progress:", acc.length, "chars");
-          }
         });
+        clearInterval(timeoutCheck);
       } catch (e) {
+        clearInterval(timeoutCheck);
         console.error("[AI] Action failed:", e);
         return { content: `[错误] ${e}`, apply: () => {} };
+      }
+
+      if (timedOut) {
+        return { content: "[错误] AI 响应超时，请检查网络和 API 设置", apply: () => {} };
+      }
+
+      if (!acc) {
+        return { content: "[错误] AI 返回了空内容", apply: () => {} };
       }
 
       console.log("[AI] Completed, response length:", acc.length);
