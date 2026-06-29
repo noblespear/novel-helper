@@ -231,6 +231,11 @@ const aiRegionTheme = EditorView.theme({
     textDecoration: "line-through",
     opacity: "0.65",
   },
+  ".cm-ai-hidden": {
+    display: "none !important",
+    height: "0 !important",
+    overflow: "hidden !important",
+  },
   ".cm-ai-badge": {
     display: "inline-block",
     marginLeft: "2px",
