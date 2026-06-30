@@ -32,53 +32,60 @@ const decoField = StateField.define<DecorationSet>({
 function buildDecos(text: string): DecorationSet {
   const regions = parseAiRegions(text);
   if (regions.length === 0) return Decoration.none;
-  const builder = new RangeSetBuilder<Decoration>();
-  // 排序:按 start
-  regions.sort((a, b) => a.start - b.start);
-  for (let i = 0; i < regions.length; i++) {
-    const r = regions[i];
+
+  // 收集所有装饰并按 from 排序
+  const decorations: Array<{ from: number; to: number; deco: any }> = [];
+
+  for (const r of regions) {
     const cls = stateToClass(r.state);
 
-    // 隐藏起始注释 <!-- @ai:id:xxx ... -->
-    builder.add(
-      r.start,
-      r.aiStart,
-      Decoration.mark({
+    // 隐藏起始注释
+    decorations.push({
+      from: r.start,
+      to: r.aiStart,
+      deco: Decoration.mark({
         attributes: { class: "cm-ai-hidden", style: "display:none" },
         inclusive: false,
-      })
-    );
+      }),
+    });
 
-    // AI 内容区装饰(浅色背景 + 虚线)
-    builder.add(
-      r.aiStart,
-      r.aiEnd,
-      Decoration.mark({
+    // AI 内容区装饰
+    decorations.push({
+      from: r.aiStart,
+      to: r.aiEnd,
+      deco: Decoration.mark({
         attributes: { class: cls },
-        // 防止 decoration 自身被嵌套
         inclusive: false,
-      })
-    );
+      }),
+    });
 
-    // 隐藏结束注释 <!-- /ai:id:xxx -->
-    builder.add(
-      r.aiEnd,
-      r.end,
-      Decoration.mark({
+    // 隐藏结束注释
+    decorations.push({
+      from: r.aiEnd,
+      to: r.end,
+      deco: Decoration.mark({
         attributes: { class: "cm-ai-hidden", style: "display:none" },
         inclusive: false,
-      })
-    );
+      }),
+    });
 
-    // 在 AI 区域末尾加一个 widget 小图标
-    builder.add(
-      r.aiEnd,
-      r.aiEnd,
-      Decoration.widget({
+    // widget 小图标
+    decorations.push({
+      from: r.aiEnd,
+      to: r.aiEnd,
+      deco: Decoration.widget({
         widget: new AiRegionBadge(r),
         side: 1,
-      })
-    );
+      }),
+    });
+  }
+
+  // 按 from 排序,如果 from 相同则按 to 排序
+  decorations.sort((a, b) => a.from - b.from || a.to - b.to);
+
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const d of decorations) {
+    builder.add(d.from, d.to, d.deco);
   }
   return builder.finish();
 }
@@ -201,12 +208,25 @@ function stateToTitle(s: AiRegion["state"]): string {
 const initView = ViewPlugin.fromClass(
   class {
     constructor(view: EditorView) {
-      // 触发一次 recompute
-      view.dispatch({ effects: recompute.of(undefined) });
+      // 延迟触发 recompute,避免在初始化期间 dispatch
+      requestAnimationFrame(() => {
+        try {
+          view.dispatch({ effects: recompute.of(undefined) });
+        } catch (e) {
+          // 忽略初始化期间的错误
+        }
+      });
     }
     update(update: ViewUpdate) {
       if (update.docChanged) {
-        update.view.dispatch({ effects: recompute.of(undefined) });
+        // 使用 requestAnimationFrame 避免在 update 期间 dispatch
+        requestAnimationFrame(() => {
+          try {
+            update.view.dispatch({ effects: recompute.of(undefined) });
+          } catch (e) {
+            // 忽略
+          }
+        });
       }
     }
   }
