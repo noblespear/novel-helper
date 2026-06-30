@@ -35,7 +35,6 @@ export function TopBar({ projectName, chapterTitle }: TopBarProps) {
           onClick={() => setCommandPaletteOpen(true)}
           title="命令面板 (Ctrl+Shift+P)"
         >
-          <span>🔍</span>
           <span className="opacity-60 text-[10px]">Ctrl+Shift+P</span>
         </button>
         <div

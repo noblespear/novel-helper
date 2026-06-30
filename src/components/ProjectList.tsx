@@ -263,7 +263,7 @@ function ProjectCard({
           }}
         >
           {project.status === "ongoing"
-            ? "📝 连载中"
+            ? "连载中"
             : project.status === "finished"
             ? "✅ 已完结"
             : "📁 草稿"}

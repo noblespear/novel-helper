@@ -132,11 +132,11 @@ export function SelectionToolbar({ onAction, scrollContainerRef }: SelectionTool
         e.stopPropagation();
       }}
     >
-      <ToolbarButton onClick={() => handleClick("polish")} label="润色" icon="✨" />
-      <ToolbarButton onClick={() => handleClick("continue")} label="续写" icon="➡️" />
-      <ToolbarButton onClick={() => handleClick("rewrite")} label="重写" icon="🔄" />
+      <ToolbarButton onClick={() => handleClick("polish")} label="润色" />
+      <ToolbarButton onClick={() => handleClick("continue")} label="续写" />
+      <ToolbarButton onClick={() => handleClick("rewrite")} label="重写" />
       <div className="w-px bg-gray-600 mx-0.5" />
-      <ToolbarButton onClick={() => handleClick("copy")} label="复制" icon="📋" />
+      <ToolbarButton onClick={() => handleClick("copy")} label="复制" />
     </div>
   );
 }
@@ -144,11 +144,9 @@ export function SelectionToolbar({ onAction, scrollContainerRef }: SelectionTool
 function ToolbarButton({
   onClick,
   label,
-  icon,
 }: {
   onClick: () => void;
   label: string;
-  icon: string;
 }) {
   return (
     <button
@@ -168,7 +166,6 @@ function ToolbarButton({
         e.currentTarget.style.color = "var(--color-text)";
       }}
     >
-      <span>{icon}</span>
       <span>{label}</span>
     </button>
   );

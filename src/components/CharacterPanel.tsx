@@ -175,7 +175,7 @@ export function CharacterPanel({ projectId }: CharacterPanelProps) {
                         : "var(--color-text-muted)",
                   }}
                 >
-                  {m === "edit" ? "编辑" : m === "roleplay" ? "🎭 角色扮演" : "🔍 知识召回"}
+                  {m === "edit" ? "编辑" : m === "roleplay" ? "角色扮演" : "知识召回"}
                 </button>
               ))}
             </div>
@@ -413,7 +413,7 @@ function RoleplayChat({
         className="px-3 py-2 text-xs text-muted border-b"
         style={{ borderColor: "var(--color-border)" }}
       >
-        🎭 正在以 <strong>{character.name}</strong> 的身份对话
+        正在以 <strong>{character.name}</strong> 的身份对话
       </div>
       <div ref={listRef} className="flex-1 overflow-auto p-3 space-y-2">
         {messages.length === 0 ? (

@@ -8,13 +8,13 @@ interface LorePanelProps {
   projectId: string;
 }
 
-const CATEGORIES: { id: LoreCategory; label: string; icon: string }[] = [
-  { id: "world", label: "世界观", icon: "🌍" },
-  { id: "faction", label: "势力", icon: "⚔️" },
-  { id: "location", label: "地点", icon: "📍" },
-  { id: "item", label: "物品", icon: "🗡️" },
-  { id: "power", label: "能力", icon: "✨" },
-  { id: "custom", label: "自定义", icon: "📝" },
+const CATEGORIES: { id: LoreCategory; label: string }[] = [
+  { id: "world", label: "世界观" },
+  { id: "faction", label: "势力" },
+  { id: "location", label: "地点" },
+  { id: "item", label: "物品" },
+  { id: "power", label: "能力" },
+  { id: "custom", label: "自定义" },
 ];
 
 export function LorePanel({ projectId }: LorePanelProps) {
@@ -94,7 +94,7 @@ export function LorePanel({ projectId }: LorePanelProps) {
               className={`px-2 py-0.5 text-xs rounded ${selectedCategory === c.id ? "bg-[var(--color-accent)] text-white" : "bg-[var(--color-elevated)]"}`}
               onClick={() => setSelectedCategory(c.id)}
             >
-              {c.icon} {c.label}
+              {c.label}
             </button>
           ))}
         </div>
@@ -128,7 +128,6 @@ export function LorePanel({ projectId }: LorePanelProps) {
                       color: "var(--color-text)",
                     }}
                   >
-                    <span className="shrink-0">{cat?.icon || "📝"}</span>
                     <span className="truncate">{e.name}</span>
                   </button>
                 );
@@ -143,7 +142,6 @@ export function LorePanel({ projectId }: LorePanelProps) {
             <div className="p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted">
-                  {CATEGORIES.find((c) => c.id === editing.category)?.icon}{" "}
                   {CATEGORIES.find((c) => c.id === editing.category)?.label}
                 </span>
                 <button

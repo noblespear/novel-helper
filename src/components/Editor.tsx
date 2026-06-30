@@ -189,7 +189,7 @@ export function Editor({ projectId }: EditorProps) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted">
         <div className="text-center">
-          <p className="text-6xl mb-4">📖</p>
+          <p className="text-6xl mb-4">+</p>
           <p>从左侧选择或新建一个章节开始写作</p>
         </div>
       </div>

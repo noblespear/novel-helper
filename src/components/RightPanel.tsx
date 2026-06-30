@@ -13,12 +13,12 @@ import { cn } from "../lib/utils";
 import type { OutlineNodeTree, ChatMessage } from "../types";
 
 const tabs = [
-  { id: "outline" as const, label: "大纲", icon: "📋" },
-  { id: "character" as const, label: "人物", icon: "👤" },
-  { id: "lore" as const, label: "设定", icon: "🌍" },
-  { id: "ai" as const, label: "AI", icon: "🤖" },
-  { id: "rag" as const, label: "检索", icon: "🔍" },
-  { id: "kb" as const, label: "知识库", icon: "📚" },
+  { id: "outline" as const, label: "大纲" },
+  { id: "character" as const, label: "人物" },
+  { id: "lore" as const, label: "设定" },
+  { id: "ai" as const, label: "AI" },
+  { id: "rag" as const, label: "检索" },
+  { id: "kb" as const, label: "知识库" },
 ];
 
 export function RightPanel() {
@@ -48,7 +48,6 @@ export function RightPanel() {
             }}
             onClick={() => setRightPanel(t.id)}
           >
-            <span>{t.icon}</span>
             <span>{t.label}</span>
           </button>
         ))}
@@ -306,7 +305,7 @@ function OutlinePanel() {
     const isExpanded = expandedIds.has(node.id);
     const isSelected = selectedId === node.id;
     const hasChildren = node.children.length > 0;
-    const levelIcon = node.level === "macro" ? "📖" : node.level === "volume" ? "📚" : "📄";
+    const levelLabel = node.level === "macro" ? "总纲" : node.level === "volume" ? "卷" : "章";
     const addable = getAddableLevels(node.level);
 
     return (
@@ -327,8 +326,8 @@ function OutlinePanel() {
             {hasChildren ? (isExpanded ? "▼" : "▶") : <span className="w-4" />}
           </button>
 
-          {/* 级别图标 */}
-          <span className="text-xs shrink-0">{levelIcon}</span>
+          {/* 级别标签 */}
+          <span className="text-xs shrink-0 text-muted">{levelLabel}</span>
 
           {/* 标题 */}
           <span className="flex-1 text-sm truncate">{node.title}</span>
@@ -378,7 +377,7 @@ function OutlinePanel() {
     <div className="flex flex-col h-full">
       {/* 头部 */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--color-border)]">
-        <span className="text-xs font-medium text-default">📋 大纲</span>
+        <span className="text-xs font-medium text-default">大纲</span>
         <div className="flex items-center gap-2">
           {selectedNode && selectedNode.level !== "chapter" && (
             <button
@@ -422,7 +421,7 @@ function OutlinePanel() {
               <div className="px-3 py-2 border-b shrink-0" style={{ borderColor: "var(--color-border)" }}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs text-muted">
-                    {selectedNode.level === "macro" ? "📖 总纲" : selectedNode.level === "volume" ? "📚 卷" : "📄 章"}
+                    {selectedNode.level === "macro" ? "总纲" : selectedNode.level === "volume" ? "卷" : "章"}
                   </span>
                 </div>
                 <input
@@ -460,7 +459,7 @@ function OutlinePanel() {
 function RAGPanel() {
   return (
     <div className="p-4">
-      <p className="mb-2 text-default">🔍 全书检索</p>
+      <p className="mb-2 text-default">全书检索</p>
       <p className="text-xs text-muted">请使用顶部「知识库」标签</p>
     </div>
   );

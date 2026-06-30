@@ -6,17 +6,16 @@ import { useAppStore } from "../stores/app";
 interface NavItem {
   id: string;
   label: string;
-  icon: string;
   requiresProject: boolean;
 }
 
 const items: NavItem[] = [
-  { id: "home", label: "我的作品", icon: "📚", requiresProject: false },
-  { id: "writing", label: "写作", icon: "✍", requiresProject: true },
+  { id: "home", label: "我的作品", requiresProject: false },
+  { id: "writing", label: "写作", requiresProject: true },
   // 人物/大纲/检索/知识库 都在右栏 tab 里(打开项目时显示),侧栏不再重复
-  { id: "setting", label: "设定", icon: "🌍", requiresProject: true },
-  { id: "material", label: "素材", icon: "💎", requiresProject: true },
-  { id: "tool", label: "工具", icon: "🔧", requiresProject: false },
+  { id: "setting", label: "设定", requiresProject: true },
+  { id: "material", label: "素材", requiresProject: true },
+  { id: "tool", label: "工具", requiresProject: false },
 ];
 
 interface SidebarProps {
@@ -61,8 +60,7 @@ export function Sidebar({ activeView, onChangeView, onGoHome }: SidebarProps) {
               }}
               title={item.label}
             >
-              <span className="text-lg leading-none">{item.icon}</span>
-              <span className="text-[10px] mt-0.5 leading-none">{item.label}</span>
+              <span className="text-[10px] leading-none">{item.label}</span>
             </button>
           );
         })}

@@ -203,7 +203,7 @@ export function AIChatPanel() {
       },
     },
     {
-      label: "📝 润色本章",
+      label: "润色本章",
       requiresChapter: true,
       action: () => {
         const chapter = chapters.find((c) => c.id === currentChapterId);
@@ -232,7 +232,7 @@ export function AIChatPanel() {
       },
     },
     {
-      label: "🎭 角色建议",
+      label: "角色建议",
       action: () => {
         const sys = pickPrompt(templates, "character_design");
         send(
