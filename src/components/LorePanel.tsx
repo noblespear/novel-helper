@@ -42,12 +42,12 @@ export function LorePanel({ projectId }: LorePanelProps) {
   });
 
   const handleAdd = async (category: LoreCategory) => {
-    const name = prompt(`输入${CATEGORIES.find((c) => c.id === category)?.label || ""}名称:`);
-    if (!name?.trim()) return;
-    const entry = await addLoreEntry(projectId, category, name.trim());
+    // 直接创建新条目，使用默认名称，然后在编辑区修改
+    const defaultName = `新${CATEGORIES.find((c) => c.id === category)?.label || "条目"}`;
+    const entry = await addLoreEntry(projectId, category, defaultName);
     if (entry) {
       setSelectedId(entry.id);
-      setEditing(entry);
+      setEditing({ ...entry });
     }
   };
 
